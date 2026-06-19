@@ -14,10 +14,9 @@ import string
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.prediction.base_predictor import ExponentialSmoother, AdaptiveExponentialSmoother, SimpleMovingAverage
-from src.prediction.arima_predictor import ARIMAModel
+from src.prediction.base_predictor import ExponentialSmoother
 from src.prediction.error_evaluator import ErrorEvaluator
-from src.prediction.layered_predictor import LowLevelPredictor, HighLevelPredictor
+from src.prediction.layered_predictor import HighLevelPredictor
 from src.drive.reward_engine import RewardEngine
 from src.optimization.micro_optimizer import MicroOptimizer
 from src.optimization.snapshot_manager import SnapshotManager

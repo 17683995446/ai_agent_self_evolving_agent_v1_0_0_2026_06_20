@@ -18,8 +18,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.core.agent_loop import AgentLoop
 from src.core.config import Config
 from src.memory.short_term import ShortTermMemory
-from src.optimization.snapshot_manager import SnapshotManager
-from src.task.task_pool import TaskPool
 from src.task.task_definition import Task, TaskType
 
 

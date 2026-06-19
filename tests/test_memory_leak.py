@@ -173,7 +173,7 @@ dashboard:
                 biggest_growth.append(f"{stat.size_diff / 1024:.1f}KB {stat.traceback.format()[-1]}")
 
         self.assertEqual(len(biggest_growth), 0,
-            f"Memory leaks detected:\n" + "\n".join(biggest_growth))
+            "Memory leaks detected:\n" + "\n".join(biggest_growth))
 
 
 class TestPerformanceStability(unittest.TestCase):

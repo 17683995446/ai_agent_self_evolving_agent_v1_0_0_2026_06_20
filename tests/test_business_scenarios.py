@@ -21,8 +21,6 @@ from src.optimization.restructure_trigger import RestructureTrigger
 from src.memory.review_engine import ReviewEngine
 from src.memory.short_term import ShortTermMemory
 from src.optimization.micro_optimizer import MicroOptimizer
-from src.safety.guardian import ResourceGuardian, BehaviorGuardian, SafetyEnforcer
-from src.task.task_pool import TaskPool
 from src.task.task_definition import Task, TaskType
 
 

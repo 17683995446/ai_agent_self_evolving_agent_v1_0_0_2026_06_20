@@ -3,11 +3,10 @@ import sys
 import unittest
 import tempfile
 import shutil
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.prediction.base_predictor import AdaptiveExponentialSmoother, ExponentialSmoother, SimpleMovingAverage
+from src.prediction.base_predictor import AdaptiveExponentialSmoother
 from src.prediction.arima_predictor import ARIMAModel
 from src.prediction.layered_predictor import LowLevelPredictor, MidLevelPredictor, HighLevelPredictor
 from src.prediction.multi_predictor import MultiPredictor

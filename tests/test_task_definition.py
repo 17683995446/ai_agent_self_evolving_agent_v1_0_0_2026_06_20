@@ -1,7 +1,6 @@
 import os
 import sys
 import unittest
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 

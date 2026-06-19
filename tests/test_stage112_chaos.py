@@ -12,14 +12,12 @@ import shutil
 import threading
 import time
 import random
-import json
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.core.agent_loop import AgentLoop
 from src.core.config import Config
 from src.memory.short_term import ShortTermMemory
-from src.monitoring.alert_manager import AlertManager
 
 
 class ChaosEngine:

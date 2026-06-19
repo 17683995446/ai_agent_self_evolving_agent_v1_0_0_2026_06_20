@@ -10,7 +10,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.perception.state_vector import StateVector
 from src.drive.reward_engine import RewardEngine
 from src.task.task_pool import TaskPool
-from src.task.task_generator import TaskGenerator
 from src.prediction.multi_predictor import MultiPredictor
 from src.prediction.error_evaluator import ErrorEvaluator
 from src.optimization.micro_optimizer import MicroOptimizer

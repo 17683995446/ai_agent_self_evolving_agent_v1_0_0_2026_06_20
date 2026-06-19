@@ -12,7 +12,6 @@ from src.core.state_machine import AgentState, StateMachine
 from src.core.event_bus import EventBus, Event
 from src.core.config_reloader import ConfigReloader
 from src.monitoring.log_aggregator import LogAggregator
-from src.dashboard.server import DashboardServer
 
 
 class TestSystemWideIntegration(unittest.TestCase):

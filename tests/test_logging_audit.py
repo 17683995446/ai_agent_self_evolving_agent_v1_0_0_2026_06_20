@@ -11,13 +11,12 @@ import tempfile
 import shutil
 import logging
 import logging.handlers
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.core.agent_loop import AgentLoop
 from src.core.config import Config
-from src.monitoring.log_aggregator import LogAggregator, LogPattern, AnomalyEvent
+from src.monitoring.log_aggregator import LogAggregator
 
 
 class TestLoggingAudit(unittest.TestCase):

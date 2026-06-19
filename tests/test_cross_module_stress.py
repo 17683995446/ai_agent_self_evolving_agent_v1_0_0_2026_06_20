@@ -17,16 +17,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.core.agent_loop import AgentLoop
 from src.core.config import Config
-from src.memory.short_term import ShortTermMemory
-from src.memory.review_engine import ReviewEngine
 from src.task.task_pool import TaskPool
-from src.task.task_generator import TaskGenerator
-from src.task.task_scorer import TaskScorer
-from src.task.task_selector import TaskSelector
-from src.prediction.multi_predictor import MultiPredictor
 from src.prediction.error_evaluator import ErrorEvaluator
-from src.drive.reward_engine import RewardEngine
-from src.optimization.snapshot_manager import SnapshotManager
 from src.optimization.auto_rollback import AutoRollback
 from src.optimization.micro_optimizer import MicroOptimizer
 from src.safety.guardian import ResourceGuardian, BehaviorGuardian, SafetyEnforcer

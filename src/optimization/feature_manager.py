@@ -1,5 +1,5 @@
 import abc
-from typing import Dict, Any, List, Set, Optional
+from typing import Dict, Any, List, Set
 from collections import deque
 
 

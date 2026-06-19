@@ -3,8 +3,7 @@
 import abc
 import time
 import logging
-import functools
-from typing import Callable, Any, Dict, Optional
+from typing import Any, Dict, Optional
 from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)

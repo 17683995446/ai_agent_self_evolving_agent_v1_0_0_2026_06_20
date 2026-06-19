@@ -1,6 +1,6 @@
 import abc
 import time
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 from .short_term import ShortTermMemory
 from .value_scorer import ValueScorer

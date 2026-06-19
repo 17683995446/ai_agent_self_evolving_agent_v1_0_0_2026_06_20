@@ -9,7 +9,6 @@ import sys
 import unittest
 import tempfile
 import shutil
-import random
 import threading
 import time
 from unittest.mock import patch

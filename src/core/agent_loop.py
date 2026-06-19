@@ -5,7 +5,7 @@ import time
 import logging
 import logging.handlers
 import threading
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple
 from collections import deque
 
 from src.core.config import Config

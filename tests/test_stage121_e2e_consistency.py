@@ -24,14 +24,10 @@ from src.memory.short_term import ShortTermMemory
 from src.optimization.snapshot_manager import SnapshotManager
 from src.optimization.auto_rollback import AutoRollback
 from src.optimization.micro_optimizer import MicroOptimizer
-from src.prediction.layered_predictor import LowLevelPredictor, MidLevelPredictor, HighLevelPredictor
-from src.prediction.error_evaluator import ErrorEvaluator
-from src.drive.reward_engine import RewardEngine
+from src.prediction.layered_predictor import LowLevelPredictor, HighLevelPredictor
 from src.task.task_pool import TaskPool
 from src.task.task_generator import TaskGenerator
 from src.task.task_scorer import TaskScorer
-from src.task.task_selector import TaskSelector
-from src.perception.state_vector import StateVector
 
 
 class TestSampleEndToEnd(unittest.TestCase):

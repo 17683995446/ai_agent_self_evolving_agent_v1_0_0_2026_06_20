@@ -1,8 +1,6 @@
 import os
 import sys
 import unittest
-import tempfile
-import shutil
 import time
 import urllib.request
 import json

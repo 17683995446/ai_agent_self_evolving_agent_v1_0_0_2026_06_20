@@ -6,7 +6,6 @@ import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.core.config import Config
-from src.core.constants import DEFAULT_CONFIG_PATH
 
 
 class TestConfig(unittest.TestCase):

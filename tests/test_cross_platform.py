@@ -15,8 +15,6 @@ import signal
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.core.config import Config
-from src.perception.system_sensor import SystemSensor
-from src.perception.state_vector import StateVector
 from src.optimization.snapshot_manager import SnapshotManager
 
 

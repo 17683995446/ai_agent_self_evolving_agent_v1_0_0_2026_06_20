@@ -18,13 +18,12 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.core.agent_loop import AgentLoop
-from src.prediction.base_predictor import ExponentialSmoother, SimpleMovingAverage, AdaptiveExponentialSmoother
+from src.prediction.base_predictor import ExponentialSmoother, SimpleMovingAverage
 from src.prediction.arima_predictor import ARIMAModel
 from src.memory.short_term import ShortTermMemory
 from src.optimization.snapshot_manager import SnapshotManager
 from src.task.task_pool import TaskPool
 from src.task.task_generator import TaskGenerator
-from src.task.task_definition import Task
 from src.core.config import Config
 
 

@@ -3,7 +3,6 @@ import sys
 import unittest
 import tempfile
 import shutil
-import time
 import asyncio
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -11,7 +10,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.core.agent_loop import AgentLoop
 from src.core.state_machine import AgentState, StateMachine
 from src.core.event_bus import EventBus, Event
-from src.safety.guardian import SafetyEnforcer
 
 
 class TestEndToEnd(unittest.TestCase):

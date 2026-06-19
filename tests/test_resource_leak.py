@@ -15,7 +15,6 @@ import tracemalloc
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import unittest
-from unittest.mock import patch
 
 from src.core.agent_loop import AgentLoop
 from src.core.config import Config

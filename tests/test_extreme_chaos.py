@@ -12,8 +12,6 @@ import shutil
 import threading
 import time
 import random
-import math
-import sqlite3
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -23,7 +21,6 @@ from src.memory.short_term import ShortTermMemory
 from src.task.task_pool import TaskPool
 from src.task.task_definition import Task, TaskType
 from src.prediction.arima_predictor import ARIMAModel
-from src.prediction.base_predictor import ExponentialSmoother
 
 
 class ExtremeChaosMonkey:

@@ -202,7 +202,6 @@ class TestARIMAFallbackCorrectness(unittest.TestCase):
 
     def test_nan_value_ignored(self):
         """NaN值应被忽略。"""
-        import math
         model = ARIMAModel(order=(1, 1, 1), min_samples=5)
         model.update(1.0)
         model.update(float('nan'))

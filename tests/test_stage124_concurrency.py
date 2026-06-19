@@ -16,7 +16,6 @@ import time
 import unittest
 import tempfile
 import threading
-import shutil
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 

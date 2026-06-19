@@ -1,11 +1,10 @@
 import os
 import sys
 import unittest
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.core.tracer import CycleTracer, get_tracer
+from src.core.tracer import CycleTracer
 
 
 class TestCycleTracer(unittest.TestCase):

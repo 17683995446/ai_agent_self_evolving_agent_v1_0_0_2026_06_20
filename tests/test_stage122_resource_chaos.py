@@ -13,14 +13,11 @@
 import os
 import sys
 import time
-import signal
 import unittest
 import tempfile
-import shutil
 import threading
-import resource
 import errno
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 

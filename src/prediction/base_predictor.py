@@ -2,7 +2,6 @@ import abc
 import math
 from typing import List, Optional, Dict, Any
 from collections import deque
-import numpy as np
 
 
 class BasePredictor(abc.ABC):

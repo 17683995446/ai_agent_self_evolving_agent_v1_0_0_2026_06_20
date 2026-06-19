@@ -7,17 +7,14 @@
 import os
 import sys
 import unittest
-import tempfile
-import shutil
 import threading
-import time
 import json
 import urllib.request
 import urllib.error
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.dashboard.server import DashboardServer, DashboardDataStore, DashboardHandler
+from src.dashboard.server import DashboardServer, DashboardDataStore
 
 
 class TestDashboardDataStore(unittest.TestCase):

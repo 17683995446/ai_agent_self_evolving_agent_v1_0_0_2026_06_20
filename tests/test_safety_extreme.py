@@ -4,7 +4,6 @@ import unittest
 import tempfile
 import shutil
 import threading
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 

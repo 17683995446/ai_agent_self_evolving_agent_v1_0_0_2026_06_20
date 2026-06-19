@@ -17,7 +17,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.core.agent_loop import AgentLoop
 from src.core.config import Config
-from src.core.state_machine import AgentState
 from src.task.task_definition import Task, TaskType
 
 

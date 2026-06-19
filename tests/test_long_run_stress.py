@@ -9,7 +9,6 @@ import sys
 import unittest
 import tempfile
 import shutil
-import time
 import random
 import threading
 

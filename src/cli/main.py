@@ -13,7 +13,6 @@ from typing import Optional
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.core.agent_loop import AgentLoop
-from src.core.state_machine import AgentState
 
 
 class BaseAgentCLI(abc.ABC):

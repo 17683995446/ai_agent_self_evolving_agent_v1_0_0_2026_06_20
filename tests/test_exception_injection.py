@@ -10,15 +10,13 @@ import unittest
 import tempfile
 import shutil
 import sqlite3
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.core.agent_loop import AgentLoop
 from src.core.config import Config
-from src.prediction.base_predictor import ExponentialSmoother
 from src.memory.short_term import ShortTermMemory
-from src.task.task_pool import TaskPool
 from src.safety.guardian import ResourceGuardian, BehaviorGuardian
 
 

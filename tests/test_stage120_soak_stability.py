@@ -15,9 +15,6 @@ import sys
 import time
 import unittest
 import tracemalloc
-import tempfile
-import shutil
-import logging
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 

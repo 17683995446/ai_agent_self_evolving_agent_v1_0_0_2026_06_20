@@ -3,7 +3,6 @@ import sys
 import unittest
 import tempfile
 import shutil
-import json
 import time
 import threading
 
@@ -305,7 +304,8 @@ class TestEndToEndDataFlowConsistency(unittest.TestCase):
     def test_agent_loop_result_structure(self):
         """AgentLoop.run_cycle结果应包含所有预期字段。"""
         from src.core.agent_loop import AgentLoop
-        import tempfile, os
+        import tempfile
+        import os
         temp_dir = tempfile.mkdtemp()
         orig_cwd = os.getcwd()
         os.chdir(temp_dir)

@@ -17,12 +17,8 @@ import sys
 import time
 import tempfile
 import threading
-import sqlite3
 import shutil
-import json
-import pickle
 import logging
-from unittest.mock import MagicMock, patch, PropertyMock
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -671,7 +667,7 @@ def main():
     for name, test_fn in tests:
         try:
             results[name] = test_fn()
-        except Exception as e:
+        except Exception:
             logger.exception("测试[%s]抛出未捕获异常", name)
             results[name] = False
 

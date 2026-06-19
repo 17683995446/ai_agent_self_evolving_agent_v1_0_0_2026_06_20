@@ -3,7 +3,6 @@ import sys
 import unittest
 import tempfile
 import shutil
-import time
 import signal
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
