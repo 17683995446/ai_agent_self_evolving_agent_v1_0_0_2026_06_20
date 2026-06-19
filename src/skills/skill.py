@@ -40,7 +40,7 @@ class Skill:
         return all(req in self.capabilities for req in required)
 
     def execute(self, task) -> Dict[str, Any]:
-        """执行技能并更新统计。"""
+        """执行技能并返回结果。统计由外部学习器统一更新。"""
         start = time.time()
         self.usage_count += 1
         self.last_used_at = time.time()
@@ -52,10 +52,8 @@ class Skill:
             }
         try:
             result = self.action(task)
-            self.update_stats(success=True)
             return {'success': True, 'result': result, 'duration': time.time() - start}
         except Exception as e:
-            self.update_stats(success=False)
             return {'success': False, 'result': str(e), 'duration': time.time() - start}
 
     def update_stats(self, success: bool) -> None:

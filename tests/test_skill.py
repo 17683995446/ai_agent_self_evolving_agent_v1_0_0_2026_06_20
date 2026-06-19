@@ -19,6 +19,7 @@ class TestSkill(unittest.TestCase):
         result = skill.execute(task)
         self.assertTrue(result['success'])
         self.assertEqual(result['result'], 3)
+        skill.update_stats(result['success'])
         self.assertEqual(skill.success_rate, 1.0)
 
     def test_skill_execute_failure(self):
@@ -26,6 +27,7 @@ class TestSkill(unittest.TestCase):
         task = Task(name='fail')
         result = skill.execute(task)
         self.assertFalse(result['success'])
+        skill.update_stats(result['success'])
         self.assertEqual(skill.success_rate, 0.0)
 
     def test_skill_can_handle(self):
@@ -93,7 +95,8 @@ class TestSkillRegistry(unittest.TestCase):
         self.assertFalse(self.registry.update_skill('missing'))
 
     def test_to_dict(self):
-        self.s1.execute(Task(name='t'))
+        result = self.s1.execute(Task(name='t'))
+        self.s1.update_stats(result['success'])
         data = self.registry.to_dict()
         self.assertEqual(data['skill_count'], 2)
         self.assertEqual(data['total_success'], 1)
@@ -116,7 +119,8 @@ class TestSkillLearner(unittest.TestCase):
         skill = Skill(name='flaky', action=lambda t: (_ for _ in ()).throw(RuntimeError('boom')))
         registry.register(skill)
         for _ in range(5):
-            skill.execute(Task(name='flaky'))
+            result = skill.execute(Task(name='flaky'))
+            learner.feedback('flaky', result['success'])
         rec = learner.improve()
         self.assertIn('flaky', rec['deprecate'])
 

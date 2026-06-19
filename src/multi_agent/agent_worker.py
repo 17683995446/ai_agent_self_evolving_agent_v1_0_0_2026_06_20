@@ -4,7 +4,6 @@ from typing import Dict, Any, List, Optional, Callable
 
 from src.task.task_pool import TaskPool
 from src.task.task_definition import Task
-from src.core.constants import TaskType
 
 
 class AgentWorker:
@@ -53,11 +52,17 @@ class AgentWorker:
         try:
             handler = action or task.action
             if handler is not None:
-                result = handler(task)
+                raw = handler(task)
+                if isinstance(raw, dict) and 'success' in raw:
+                    success = bool(raw['success'])
+                    result = raw.get('result', raw)
+                else:
+                    success = True
+                    result = raw
             else:
                 result = f"executed by {self.worker_id}"
-            success = True
-            reward = 1.0
+                success = True
+            reward = 1.0 if success else -1.0
         except Exception as e:
             result = str(e)
             success = False
@@ -70,6 +75,7 @@ class AgentWorker:
         record = {
             'worker_id': self.worker_id,
             'task_id': task.id,
+            'task_name': task.name,
             'success': success,
             'reward': reward,
             'duration': duration,

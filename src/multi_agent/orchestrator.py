@@ -82,7 +82,6 @@ class MultiAgentOrchestrator:
     def _select_capability_match(
         self, workers: List[AgentWorker], task: Task
     ) -> Optional[AgentWorker]:
-        required = task.params.get('required_capabilities', [])
         candidates = [w for w in workers if w.can_handle(task)]
         if not candidates:
             return None
