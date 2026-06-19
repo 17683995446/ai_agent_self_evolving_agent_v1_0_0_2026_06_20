@@ -153,10 +153,16 @@ class LongTaskPlanner:
         return self.memory.save_knowledge(self.plan_id, data)
 
     def resume(self) -> Optional[Dict[str, Any]]:
-        """从长期记忆中的 checkpoint 恢复并继续执行。"""
+        """从长期记忆中的 checkpoint 恢复并继续执行。
+
+        若 checkpoint 损坏或不可读，返回 None 而非抛出异常。
+        """
         if self.memory is None:
             return None
-        checkpoint = self.memory.load_knowledge(self.plan_id)
+        try:
+            checkpoint = self.memory.load_knowledge(self.plan_id)
+        except Exception:
+            return None
         if checkpoint is None:
             return None
         self._current_index = checkpoint.get('step_index', 0)

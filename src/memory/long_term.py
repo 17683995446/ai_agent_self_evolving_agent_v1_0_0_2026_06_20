@@ -67,8 +67,11 @@ class BaseLongTermMemory(abc.ABC):
         filepath = os.path.join(self.knowledge_dir, f"{key}.json")
         if not os.path.exists(filepath):
             return None
-        with open(filepath, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return None
 
     def list_knowledge_keys(self) -> List[str]:
         """List all knowledge keys.
