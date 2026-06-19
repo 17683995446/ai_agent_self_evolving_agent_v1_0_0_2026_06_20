@@ -5,6 +5,7 @@ from src.multi_agent.orchestrator import MultiAgentOrchestrator
 from src.skills.skill_registry import SkillRegistry
 from src.skills.skill_learner import SkillLearner
 from src.planning.long_task_planner import LongTaskPlanner
+from src.planning.long_task_reviewer import LongTaskReviewer
 from src.memory.long_term import LongTermMemory
 from src.monitoring.performance_tracker import PerformanceTracker
 
@@ -16,6 +17,7 @@ class MultiAgentLongTaskRunner:
     - 自动为子任务匹配已注册技能并通过 Orchestrator 分发给合适的 Agent。
     - 执行结束后自动用 SkillLearner 吸收反馈，持续自增强。
     - 可选 PerformanceTracker，提供 mission / step 级可观测性指标。
+    - 可选 LongTaskReviewer，执行后自动持久化轨迹并离线复盘。
     """
 
     def __init__(
@@ -25,12 +27,15 @@ class MultiAgentLongTaskRunner:
         learner: Optional[SkillLearner] = None,
         memory: Optional[LongTermMemory] = None,
         tracker: Optional[PerformanceTracker] = None,
+        reviewer: Optional[LongTaskReviewer] = None,
     ) -> None:
         self.orchestrator = orchestrator
         self.registry = registry or SkillRegistry()
         self.learner = learner or SkillLearner(self.registry)
         self.memory = memory
         self.tracker = tracker or PerformanceTracker()
+        self.reviewer = reviewer
+        self._last_review: Optional[Dict[str, Any]] = None
 
     def register_skill(
         self,
@@ -54,8 +59,12 @@ class MultiAgentLongTaskRunner:
         steps: List[Task],
         max_steps: int = 100,
         continue_on_failure: bool = False,
+        auto_review: bool = True,
     ) -> Dict[str, Any]:
-        """自驱动执行多 Agent 长任务，并记录性能与可观测性指标。"""
+        """自驱动执行多 Agent 长任务，并记录性能与可观测性指标。
+
+        :param auto_review: 若为 True 且已配置 reviewer，执行后自动触发离线复盘。
+        """
         planner = LongTaskPlanner(
             goal,
             orchestrator=self.orchestrator,
@@ -89,6 +98,12 @@ class MultiAgentLongTaskRunner:
             )
 
         self._learn(summary)
+
+        if auto_review and self.reviewer is not None:
+            self.reviewer.persist_mission(summary)
+            self._last_review = self.reviewer.review(summary)
+            summary['review'] = self._last_review
+
         return summary
 
     def _learn(self, summary: Dict[str, Any]) -> None:
@@ -103,3 +118,8 @@ class MultiAgentLongTaskRunner:
     def performance_summary(self) -> Dict[str, Any]:
         """返回性能追踪摘要。"""
         return self.tracker.summary()
+
+    def last_review(self) -> Optional[Dict[str, Any]]:
+        """返回最近一次复盘结果。"""
+        return self._last_review
+
