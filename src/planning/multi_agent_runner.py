@@ -6,6 +6,7 @@ from src.skills.skill_registry import SkillRegistry
 from src.skills.skill_learner import SkillLearner
 from src.planning.long_task_planner import LongTaskPlanner
 from src.memory.long_term import LongTermMemory
+from src.monitoring.performance_tracker import PerformanceTracker
 
 
 class MultiAgentLongTaskRunner:
@@ -14,6 +15,7 @@ class MultiAgentLongTaskRunner:
     - 支持将长任务分解为带能力要求的子任务。
     - 自动为子任务匹配已注册技能并通过 Orchestrator 分发给合适的 Agent。
     - 执行结束后自动用 SkillLearner 吸收反馈，持续自增强。
+    - 可选 PerformanceTracker，提供 mission / step 级可观测性指标。
     """
 
     def __init__(
@@ -22,11 +24,13 @@ class MultiAgentLongTaskRunner:
         registry: Optional[SkillRegistry] = None,
         learner: Optional[SkillLearner] = None,
         memory: Optional[LongTermMemory] = None,
+        tracker: Optional[PerformanceTracker] = None,
     ) -> None:
         self.orchestrator = orchestrator
         self.registry = registry or SkillRegistry()
         self.learner = learner or SkillLearner(self.registry)
         self.memory = memory
+        self.tracker = tracker or PerformanceTracker()
 
     def register_skill(
         self,
@@ -51,7 +55,7 @@ class MultiAgentLongTaskRunner:
         max_steps: int = 100,
         continue_on_failure: bool = False,
     ) -> Dict[str, Any]:
-        """自驱动执行多 Agent 长任务。"""
+        """自驱动执行多 Agent 长任务，并记录性能与可观测性指标。"""
         planner = LongTaskPlanner(
             goal,
             orchestrator=self.orchestrator,
@@ -70,7 +74,20 @@ class MultiAgentLongTaskRunner:
             action: Optional[Callable] = make_action() if skill is not None else None
             planner.add_step(step, action=action)
 
-        summary = planner.run()
+        with self.tracker.time('mission', tags={'plan_id': planner.plan_id, 'goal': goal.name}):
+            summary = planner.run()
+
+        for record in summary.get('results', []):
+            self.tracker.record(
+                'step',
+                record.get('duration', 0.0),
+                tags={
+                    'task_name': record.get('task_name'),
+                    'worker_id': record.get('worker_id'),
+                    'success': record.get('success'),
+                },
+            )
+
         self._learn(summary)
         return summary
 
@@ -82,3 +99,7 @@ class MultiAgentLongTaskRunner:
     def skill_stats(self) -> Dict[str, Any]:
         """返回技能注册表统计。"""
         return self.registry.to_dict()
+
+    def performance_summary(self) -> Dict[str, Any]:
+        """返回性能追踪摘要。"""
+        return self.tracker.summary()
