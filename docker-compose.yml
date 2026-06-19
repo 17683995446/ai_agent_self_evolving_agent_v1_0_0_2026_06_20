@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  agent:
+    build: .
+    container_name: self_evolving_agent
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./snapshots:/app/snapshots
+      - ./config:/app/config
+    environment:
+      - PYTHONUNBUFFERED=1
+      - AGENT_ENV=prod
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-m", "src.cli.main", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s

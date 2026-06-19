@@ -1,0 +1,67 @@
+goals:
+  precision_evolution: true
+  coverage_evolution: true
+  efficiency_evolution: true
+
+base_weights:
+  safe: 0.4
+  gain: 0.4
+  eff: 0.2
+
+resource_limits:
+  max_cpu_percent: 20.0
+  max_mem_percent: 20.0
+  max_db_size_mb: 500
+  max_snapshot_count: 10
+
+exploration:
+  base_ratio: 0.3
+  stable_threshold: 0.05
+  emergency_ratio: 0.1
+  novel_ratio: 0.4
+
+models:
+  smoothing_alpha: 0.3
+  smoothing_alpha_min: 0.05
+  smoothing_alpha_max: 0.8
+  arima_order: [1, 1, 1]
+  prediction_horizon: 1
+
+safety:
+  max_consecutive_failures: 5
+  forbidden_paths:
+    - /boot
+    - /etc/shadow
+    - /proc
+    - /sys
+    - /dev
+    - /bin
+    - /sbin
+    - /lib
+    - /lib64
+    - /usr/bin
+    - /usr/sbin
+  max_model_restructure_iterations: 3
+
+review:
+  interval_hours: 6
+  min_samples: 100
+  idle_cpu_threshold: 10.0
+  idle_duration_seconds: 300
+
+memory:
+  max_short_term_samples: 10000
+  value_retention_ratio: 0.3
+  history_window: 100
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: logs/agent.log
+  max_bytes: 10485760
+  backup_count: 5
+
+paths:
+  data_dir: data
+  snapshot_dir: snapshots
+  log_dir: logs
