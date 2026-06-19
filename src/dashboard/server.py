@@ -412,6 +412,8 @@ class _DashboardHandler(BaseHTTPRequestHandler, abc.ABC):
 
     data_store: Optional[_DashboardDataStore] = None
     alert_manager: Optional[Any] = None
+    metrics_provider: Optional[Callable[[], Dict[str, Any]]] = None
+    skills_provider: Optional[Callable[[], Dict[str, Any]]] = None
 
     @abc.abstractmethod
     def do_GET(self):
@@ -436,6 +438,10 @@ class _DashboardHandler(BaseHTTPRequestHandler, abc.ABC):
             return self._serve_health
         elif self.path == '/api/alerts':
             return self._serve_alerts
+        elif self.path == '/api/metrics':
+            return self._serve_metrics
+        elif self.path == '/api/skills':
+            return self._serve_skills
         return self._send_404
 
     def _send_404(self) -> None:
@@ -487,6 +493,24 @@ class _DashboardHandler(BaseHTTPRequestHandler, abc.ABC):
             stats = {}
         payload = {'alerts': data, 'stats': stats}
         self.wfile.write(json.dumps(payload, default=str).encode('utf-8'))
+
+    def _serve_metrics(self):
+        """输出 PerformanceTracker 性能指标。"""
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        metrics = self.metrics_provider() if self.metrics_provider is not None else {}
+        self.wfile.write(json.dumps(metrics, default=str).encode('utf-8'))
+
+    def _serve_skills(self):
+        """输出技能注册表统计。"""
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        skills = self.skills_provider() if self.skills_provider is not None else {}
+        self.wfile.write(json.dumps(skills, default=str).encode('utf-8'))
 
 
 class DashboardHandler(_DashboardHandler):
@@ -571,6 +595,26 @@ class _DashboardServer(abc.ABC):
         :rtype: None
         """
         DashboardHandler.alert_manager = alert_manager
+
+    def set_metrics_provider(self, provider: Callable[[], Dict[str, Any]]) -> None:
+        """设置性能指标提供者，用于 /api/metrics 路由。
+
+        :param provider: 返回性能指标字典的可调用对象
+        :type provider: Callable[[], Dict[str, Any]]
+        :return: None
+        :rtype: None
+        """
+        DashboardHandler.metrics_provider = provider
+
+    def set_skills_provider(self, provider: Callable[[], Dict[str, Any]]) -> None:
+        """设置技能统计提供者，用于 /api/skills 路由。
+
+        :param provider: 返回技能统计字典的可调用对象
+        :type provider: Callable[[], Dict[str, Any]]
+        :return: None
+        :rtype: None
+        """
+        DashboardHandler.skills_provider = provider
 
     def _start_server_thread(self) -> None:
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
