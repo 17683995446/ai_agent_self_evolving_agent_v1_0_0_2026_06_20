@@ -358,7 +358,32 @@ class AgentLoop(BaseAgentLoop):
         logger.info("[Cycle %s] END, duration=%.4fs", cycle, duration)
         result = self._build_result(result_data, duration)
         self._update_dashboard(result)
+        self._persist_metrics()
         return result
+
+    def _persist_metrics(self) -> None:
+        """将关键指标持久化到 data/metrics.json，供轻量 status 命令读取。
+
+        :return: 无。
+        :rtype: None
+        :raises: 无（写入失败仅记录日志，不影响主循环）。
+        """
+        try:
+            import json
+            data_dir = self.cfg.get('paths', {}).get('data_dir', 'data')
+            os.makedirs(data_dir, exist_ok=True)
+            metrics = {
+                'cycle_count': self._cycle_count,
+                'memory_samples': self.memory.get_sample_count(),
+                'recent_mae': self.state_vector._get_recent_mae(),
+                'recent_success_rate': self.state_vector._get_recent_success_rate(),
+                'timestamp': time.time(),
+            }
+            metrics_path = os.path.join(data_dir, 'metrics.json')
+            with open(metrics_path, 'w', encoding='utf-8') as f:
+                json.dump(metrics, f, indent=2)
+        except Exception as e:
+            logger.debug("AgentLoop._persist_metrics: failed to write metrics: %s", e)
 
     def run_cycle(self) -> Dict[str, Any]:
         """执行一个完整的主循环周期。

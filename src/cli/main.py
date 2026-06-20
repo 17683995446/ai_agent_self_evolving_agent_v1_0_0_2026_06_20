@@ -203,13 +203,16 @@ class AgentCLI(BaseAgentCLI):
         # 轻量读取记忆样本数（直接查 SQLite，不实例化 AgentLoop）
         memory_samples = self._count_memory_samples(data_dir)
 
-        # 读取最近日志的 MAE 与成功率（从状态向量持久化文件，若存在）
-        recent_mae, recent_success_rate = self._read_recent_metrics(data_dir)
+        # 读取最近指标（从 metrics.json，由 AgentLoop 每周期写入）
+        metrics = self._read_metrics(data_dir)
+        recent_mae = metrics.get('recent_mae', 0.0)
+        recent_success_rate = metrics.get('recent_success_rate', 0.0)
+        cycle_count = metrics.get('cycle_count') or self._read_cycle_count(data_dir)
 
         return {
             'running': running,
             'pid': pid,
-            'cycle_count': self._read_cycle_count(data_dir),
+            'cycle_count': cycle_count,
             'memory_samples': memory_samples,
             'recent_mae': recent_mae,
             'recent_success_rate': recent_success_rate,
@@ -248,17 +251,22 @@ class AgentCLI(BaseAgentCLI):
             pass
         return 0
 
-    def _read_recent_metrics(self, data_dir: str) -> tuple:
-        """读取最近的 MAE 与成功率（从指标文件，若存在）。"""
+    def _read_metrics(self, data_dir: str) -> Dict[str, Any]:
+        """读取 metrics.json（由 AgentLoop 每周期写入）。
+
+        :param data_dir: 数据目录。
+        :type data_dir: str
+        :return: 指标字典，文件不存在时返回空字典。
+        :rtype: Dict[str, Any]
+        """
         metrics_path = os.path.join(data_dir, 'metrics.json')
         if not os.path.exists(metrics_path):
-            return 0.0, 0.0
+            return {}
         try:
-            with open(metrics_path, 'r') as f:
-                metrics = json.load(f)
-            return metrics.get('recent_mae', 0.0), metrics.get('recent_success_rate', 0.0)
+            with open(metrics_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
         except (json.JSONDecodeError, OSError):
-            return 0.0, 0.0
+            return {}
 
     def _get_agent_stats(self, config_path: str) -> Dict[str, Any]:
         """完整状态查询（实例化 AgentLoop，保留以兼容旧调用）。"""
