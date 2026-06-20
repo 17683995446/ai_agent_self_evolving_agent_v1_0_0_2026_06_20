@@ -345,7 +345,8 @@ class AgentCLI(BaseAgentCLI):
             count = cursor.fetchone()[0]
             conn.close()
             return count
-        except sqlite3.Error:
+        except sqlite3.Error as e:
+            logger.debug("Failed to count memory samples from %s: %s", db_path, e)
             return 0
 
     def _read_cycle_count(self, data_dir: str) -> int:
@@ -360,8 +361,8 @@ class AgentCLI(BaseAgentCLI):
                 return max((s.get('cycle', 0) for s in index), default=0)
             if isinstance(index, dict):
                 return index.get('cycle_count', 0)
-        except (json.JSONDecodeError, OSError):
-            pass
+        except (json.JSONDecodeError, OSError) as e:
+            logger.debug("Failed to read cycle count from %s: %s", index_path, e)
         return 0
 
     def _read_metrics(self, data_dir: str) -> Dict[str, Any]:
@@ -378,7 +379,8 @@ class AgentCLI(BaseAgentCLI):
         try:
             with open(metrics_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as e:
+            logger.debug("Failed to read metrics from %s: %s", metrics_path, e)
             return {}
 
     def _get_agent_stats(self, config_path: str) -> Dict[str, Any]:
@@ -596,10 +598,10 @@ class AgentCLI(BaseAgentCLI):
             return 1
 
         if os.path.exists(config_path):
-            print(f"\nConfig already exists: {config_path}")
-            confirm = input("Overwrite? (y/N): ").strip().lower()
+            print(f"\n配置已存在: {config_path}")
+            confirm = input("是否覆盖? (y/N): ").strip().lower()
             if confirm != 'y':
-                print("Cancelled.")
+                print("已取消。")
                 return 0
 
         os.makedirs(os.path.dirname(config_path) or '.', exist_ok=True)
@@ -609,20 +611,20 @@ class AgentCLI(BaseAgentCLI):
             f.write('\n# === Wizard Customized Settings ===\n')
             yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
-        print(f"\nConfig created: {config_path}")
-        print("Next steps:")
-        print(f"  1. Run 'self-evolving-agent -c {config_path} config validate'")
-        print(f"  2. Run 'self-evolving-agent -c {config_path} doctor'")
-        print(f"  3. Run 'self-evolving-agent -c {config_path} start'")
+        print(f"\n配置已创建: {config_path}")
+        print("后续步骤:")
+        print(f"  1. 运行 'self-evolving-agent -c {config_path} config validate'")
+        print(f"  2. 运行 'self-evolving-agent -c {config_path} doctor'")
+        print(f"  3. 运行 'self-evolving-agent -c {config_path} start'")
         return 0
 
     def _run_wizard_questions(self) -> Dict[str, Any]:
         """执行向导问答，返回用户定制的配置字典。"""
-        print("Choose a profile (affects resource limits and exploration):")
-        print("  1. conservative (CPU<=10%, memory<=10%, low exploration)")
-        print("  2. balanced     (CPU<=20%, memory<=20%, medium exploration) [default]")
-        print("  3. aggressive   (CPU<=50%, memory<=50%, high exploration)")
-        profile = input("Select [1/2/3]: ").strip() or '2'
+        print("选择运行模式（影响资源限制和探索行为）:")
+        print("  1. conservative（保守: CPU<=10%, 内存<=10%, 低探索）")
+        print("  2. balanced     （均衡: CPU<=20%, 内存<=20%, 中探索）[默认]")
+        print("  3. aggressive   （激进: CPU<=50%, 内存<=50%, 高探索）")
+        profile = input("请选择 [1/2/3]: ").strip() or '2'
 
         profiles = {
             '1': {'cpu': 10.0, 'mem': 10.0, 'explore': 0.2, 'name': 'conservative'},
@@ -630,15 +632,15 @@ class AgentCLI(BaseAgentCLI):
             '3': {'cpu': 50.0, 'mem': 50.0, 'explore': 0.5, 'name': 'aggressive'},
         }
         p = profiles.get(profile, profiles['2'])
-        print(f"  -> Selected: {p['name']}")
+        print(f"  -> 已选择: {p['name']}")
         print()
 
-        log_level = input("Log level [DEBUG/INFO/WARNING/ERROR] (default INFO): ").strip().upper() or 'INFO'
-        print(f"  -> Log level: {log_level}")
+        log_level = input("日志级别 [DEBUG/INFO/WARNING/ERROR]（默认 INFO）: ").strip().upper() or 'INFO'
+        print(f"  -> 日志级别: {log_level}")
         print()
 
-        data_dir = input("Data directory (default 'data'): ").strip() or 'data'
-        print(f"  -> Data dir: {data_dir}")
+        data_dir = input("数据目录（默认 'data'）: ").strip() or 'data'
+        print(f"  -> 数据目录: {data_dir}")
         print()
 
         return {
@@ -1142,8 +1144,9 @@ paths:
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind((host, preferred_port))
                 return preferred_port
-        except OSError:
-            pass
+        except OSError as e:
+            logger.debug("Preferred port %s unavailable, falling back to OS-assigned: %s",
+                         preferred_port, e)
         # 由 OS 分配可用端口
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind((host, 0))
@@ -1273,7 +1276,8 @@ paths:
                     'duration': 0.0,
                 })
             return history
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as e:
+            logger.debug("Failed to read history from snapshots: %s", e)
             return []
 
     def cmd_cleanup(self, args: argparse.Namespace) -> int:
@@ -1314,7 +1318,7 @@ paths:
             total_freed += self._vacuum_memory_db(data_dir, dry_run)
 
         print()
-        print("-" * 50)
+        print("-" * SEPARATOR_WIDTH)
         if dry_run:
             print(_color.warn(f"Would free approximately {self._format_size(total_freed)}"))
         else:
@@ -1419,7 +1423,8 @@ paths:
             with open(index_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             return data if isinstance(data, list) else []
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as e:
+            logger.debug("Failed to load snapshot index from %s: %s", index_path, e)
             return []
 
     def _cleanup_logs(self, log_dir: str, keep: int,
