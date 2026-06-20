@@ -1,15 +1,15 @@
 import abc
 import os
-import sys
 import time
 import logging
-import logging.handlers
 import threading
 from typing import Dict, Any, Optional, Tuple
 from collections import deque
 
 from .config import Config
 from .constants import DEFAULT_CONFIG_PATH
+from .logging_config import SafeRotatingFileHandler, LoggingConfigurator
+from .task_executor import TaskExecutor
 from src.perception.state_vector import StateVector
 from src.prediction.layered_predictor import LowLevelPredictor, MidLevelPredictor, HighLevelPredictor
 from src.prediction.error_evaluator import ErrorEvaluator
@@ -28,29 +28,9 @@ from src.monitoring.alert_manager import AlertManager
 
 logger = logging.getLogger(__name__)
 
-
-class SafeRotatingFileHandler(logging.handlers.RotatingFileHandler):
-    """安全的日志文件轮转处理器。
-
-    在磁盘满、IO错误等场景下捕获OSError，避免日志写入异常导致应用崩溃，
-    同时向标准错误输出简要提示。
-    """
-
-    def emit(self, record: logging.LogRecord) -> None:
-        try:
-            super().emit(record)
-        except OSError as e:
-            try:
-                sys.stderr.write(f"[LOGGING ERROR] failed to write log: {e}\n")
-            except OSError:
-                pass
-
-    def handleError(self, record: logging.LogRecord) -> None:
-        """覆盖默认错误处理，防止异常上抛。"""
-        try:
-            sys.stderr.write(f"[LOGGING ERROR] handler error for record {record.name}\n")
-        except OSError:
-            pass
+# 向后兼容：SafeRotatingFileHandler 已迁移至 logging_config 模块，
+# 此处通过 __all__ 确保从 agent_loop 导入仍可用（测试依赖此导入路径）。
+__all__ = ['AgentLoop', 'BaseAgentLoop', 'SafeRotatingFileHandler']
 
 
 class BaseAgentLoop(abc.ABC):
@@ -85,6 +65,15 @@ class BaseAgentLoop(abc.ABC):
         self._init_dashboard()
         self._init_alert_manager()
         self._init_counters()
+        self._init_task_executor()
+
+    def _init_task_executor(self) -> None:
+        """初始化任务执行器（依赖 behavior_guardian/task_pool/state_vector）。"""
+        self._task_executor = TaskExecutor(
+            behavior_guardian=self.behavior_guardian,
+            task_pool=self.task_pool,
+            state_vector=self.state_vector,
+        )
 
     @abc.abstractmethod
     def run_cycle(self) -> Dict[str, Any]:
@@ -263,45 +252,18 @@ class AgentLoop(BaseAgentLoop):
         self._lock = threading.RLock()
 
     def _setup_logging(self) -> None:
-        """配置日志系统。"""
-        log_cfg = self.cfg.get('logging', {})
-        level = getattr(logging, log_cfg.get('level', 'INFO').upper(), logging.INFO)
-        log_dir = self.cfg.get('paths', {}).get('log_dir', 'logs')
-        os.makedirs(log_dir, exist_ok=True)
-        handler = self._create_log_handler(log_cfg, log_dir)
-        self._log_handler = handler
-        self._configure_root_logger(level, handler)
-
-    def _create_log_handler(self, log_cfg: Dict[str, Any], log_dir: str) -> SafeRotatingFileHandler:
-        log_file = os.path.join(log_dir, log_cfg.get('file', 'agent.log').split('/')[-1])
-        handler = SafeRotatingFileHandler(log_file, maxBytes=log_cfg.get('max_bytes', 10485760), backupCount=log_cfg.get('backup_count', 5))
-        handler.setFormatter(self._create_formatter(log_cfg))
-        return handler
-
-    def _create_formatter(self, log_cfg: Dict[str, Any]) -> logging.Formatter:
-        fmt = log_cfg.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        return logging.Formatter(fmt)
+        """配置日志系统（委托至 LoggingConfigurator）。"""
+        self._log_handler = LoggingConfigurator.setup(self.cfg)
 
     def _configure_root_logger(self, level: int, handler: SafeRotatingFileHandler) -> None:
-        root = logging.getLogger()
-        root.setLevel(level)
-        self._close_existing_file_handlers(root)
-        root.addHandler(handler)
-
-    def _close_existing_file_handlers(self, root: logging.Logger) -> None:
-        for h in list(root.handlers):
-            if isinstance(h, (logging.handlers.RotatingFileHandler, SafeRotatingFileHandler)):
-                root.removeHandler(h)
-                h.close()
+        """配置根日志器（委托至 LoggingConfigurator，保留以兼容测试）。"""
+        LoggingConfigurator.configure_root_logger(level, handler)
 
     def _remove_log_handler(self) -> None:
+        """移除日志处理器（委托至 LoggingConfigurator，保留以兼容测试）。"""
         handler = getattr(self, '_log_handler', None)
-        if handler is not None:
-            root = logging.getLogger()
-            if handler in root.handlers:
-                root.removeHandler(handler)
-            handler.close()
-            self._log_handler = None
+        LoggingConfigurator.remove_log_handler(handler)
+        self._log_handler = None
 
     def _next_cycle(self) -> int:
         """获取下一个周期编号。"""
@@ -640,7 +602,7 @@ class AgentLoop(BaseAgentLoop):
 
     def _execute_task(self, task: Any, state: Dict[str, Any],
                       high_preds: Dict[str, Any]) -> Dict[str, Any]:
-        """执行任务并返回结果。
+        """执行任务并返回结果（委托至 TaskExecutor，保留以兼容测试 patch）。
 
         :param task: 任务对象。
         :type task: Any
@@ -652,64 +614,7 @@ class AgentLoop(BaseAgentLoop):
         :rtype: Dict[str, Any]
         :raises: 无。
         """
-        if task is None:
-            return {'status': 'no_task', 'success': True}
-        if self._is_forbidden(task):
-            return {'status': 'forbidden', 'success': False}
-        return self._execute_valid_task(task, state, high_preds)
-
-    def _execute_valid_task(self, task: Any, state: Dict[str, Any], high_preds: Dict[str, Any]) -> Dict[str, Any]:
-        success, reward = self._run_task_action(task, state, high_preds)
-        self._update_task_after_execution(task, success)
-        self.task_pool.mark_executed(task.id, success, reward)
-        self.state_vector.update_task_success(success)
-        return {'status': 'executed', 'task_id': task.id, 'success': success, 'reward': reward}
-
-    def _update_task_after_execution(self, task: Any, success: bool) -> None:
-        if not self.behavior_guardian.check_exploration(task.id, success):
-            logger.warning("Task %s frozen due to consecutive failures", task.id)
-            self.task_pool.freeze_task(task.id)
-
-    def _is_forbidden(self, task: Any) -> bool:
-        """检查任务是否被禁止。"""
-        if hasattr(task, 'target_path') and task.target_path:
-            if not self.behavior_guardian.check_path(task.target_path):
-                logger.warning("Task %s forbidden path: %s", task.id, task.target_path)
-                self.task_pool.freeze_task(task.id)
-                return True
-        return False
-
-    def _run_task_action(self, task: Any, state: Dict[str, Any], high_preds: Dict[str, Any]) -> Tuple[bool, float]:
-        """运行任务动作并返回结果。"""
-        try:
-            success = self._execute_action(task, state, high_preds)
-            return success, 1.0 if success else 0.0
-        except Exception as e:
-            logger.error("Task execution error: %s", e)
-            return False, 0.0
-
-    def _execute_action(self, task: Any, state: Dict[str, Any], high_preds: Dict[str, Any]) -> bool:
-        action = high_preds.get('recommended_action', 'continue_exploration')
-        if action == 'emergency_safeguard':
-            return self._do_safeguard(task, state)
-        elif action == 'increase_monitoring':
-            return self._do_monitoring(task, state)
-        return self._do_exploration(task, state)
-
-    def _do_safeguard(self, task: Any, state: Dict[str, Any]) -> bool:
-        """执行保护动作。"""
-        logger.info("Safeguard action for task %s", task.id)
-        return True
-
-    def _do_monitoring(self, task: Any, state: Dict[str, Any]) -> bool:
-        """执行监控动作。"""
-        logger.info("Monitoring action for task %s", task.id)
-        return True
-
-    def _do_exploration(self, task: Any, state: Dict[str, Any]) -> bool:
-        """执行探索动作。"""
-        logger.info("Exploration action for task %s: %s", task.id, task.name)
-        return True
+        return self._task_executor.execute(task, state, high_preds)
 
     def _emergency_response(self, state: Dict[str, Any],
                             safety: Dict[str, Any],
@@ -750,7 +655,6 @@ class AgentLoop(BaseAgentLoop):
 
     def _check_review_conditions(self, state: Dict[str, Any]) -> bool:
         sample_count = self.memory.get_sample_count()
-        idle_cpu = self.cfg.get('review', {}).get('idle_cpu_threshold', 10.0)
         system_cpu = state.get('system', {}).get('cpu_percent', 100.0)
         return self.review_engine.should_review(sample_count, 100.0 - system_cpu)
 
