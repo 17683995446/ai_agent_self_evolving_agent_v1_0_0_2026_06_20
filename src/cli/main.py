@@ -646,11 +646,12 @@ paths:
         config_path = args.config or DEFAULT_CONFIG_PATH
         if not self._validate_config_path(config_path):
             return 1
+        verbose = getattr(args, 'verbose', False)
         result = self._run_single_cycle(config_path)
         if args.json:
             print(json.dumps(self._simplify_result(result), indent=2))
         else:
-            self._print_cycle_result(result)
+            self._print_cycle_result(result, verbose)
         return 0
 
     def _run_single_cycle(self, config_path: str) -> Dict[str, Any]:
@@ -669,12 +670,29 @@ paths:
             'duration_seconds': result['duration_seconds'],
         }
 
-    def _print_cycle_result(self, result: Dict[str, Any]) -> None:
+    def _print_cycle_result(self, result: Dict[str, Any], verbose: bool = False) -> None:
         print(f"Cycle {result['cycle']} completed in {result['duration_seconds']:.4f}s")
         print(f"Errors: {result['errors']}")
         print(f"Reward: {result['reward']['total_reward']:.4f}")
         print(f"Execution: {result['execution']['status']}")
         print(f"Safety: emergency={result['safety']['emergency_mode']}")
+        if verbose:
+            print()
+            print("--- Verbose Details ---")
+            reward = result.get('reward', {})
+            print(f"  Reward breakdown: safe={reward.get('safe_reward', 0):.4f}, "
+                  f"gain={reward.get('gain_reward', 0):.4f}, eff={reward.get('eff_reward', 0):.4f}")
+            execution = result.get('execution', {})
+            print(f"  Execution: task_id={execution.get('task_id', '-')}, "
+                  f"success={execution.get('success', '-')}")
+            safety = result.get('safety', {})
+            print(f"  Safety: cpu={safety.get('cpu_percent', 0):.1f}%, "
+                  f"mem={safety.get('mem_percent', 0):.1f}%")
+            errors = result.get('errors', {})
+            if isinstance(errors, dict):
+                print(f"  Error details: cpu={errors.get('cpu_percent', 0):.4f}, "
+                      f"mem={errors.get('mem_percent', 0):.4f}, "
+                      f"disk={errors.get('disk_percent', 0):.4f}")
 
     def cmd_quickstart(self, args: argparse.Namespace) -> int:
         """一键快速体验：doctor → config init → cycle → status。
@@ -918,6 +936,8 @@ Examples:
                         version=f'self-evolving-agent {_get_version()}')
     parser.add_argument('--config', '-c', help='Path to config file')
     parser.add_argument('--json', action='store_true', help='Output in JSON format')
+    parser.add_argument('--verbose', '-v', action='store_true',
+                        help='Verbose output (detailed cycle info)')
 
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
 

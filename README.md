@@ -89,6 +89,7 @@ self-evolving-agent <command> [options]
 - `--version, -V`：查看版本号
 - `--config, -c`：指定配置文件路径（默认按 `AGENT_ENV` 环境变量选择 dev/test/prod）
 - `--json`：以 JSON 格式输出（适用于 `status`、`cycle`）
+- `--verbose, -v`：详细输出模式（显示周期分解详情，适用于 `cycle`）
 
 **环境变量**：
 
