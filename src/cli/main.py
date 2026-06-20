@@ -584,7 +584,7 @@ class AgentCLI(BaseAgentCLI):
         """
         config_path = args.config or DEFAULT_CONFIG_PATH
         print("=" * SEPARATOR_WIDTH)
-        print("  Self-Evolving Agent - Configuration Wizard")
+        print("  Self-Evolving Agent - 配置向导")
         print("  交互式配置向导，按 Ctrl+C 取消")
         print("=" * SEPARATOR_WIDTH)
         print()
@@ -592,7 +592,7 @@ class AgentCLI(BaseAgentCLI):
         try:
             cfg = self._run_wizard_questions()
         except KeyboardInterrupt:
-            print("\nWizard cancelled.")
+            print("\n向导已取消。")
             return 1
 
         if os.path.exists(config_path):
@@ -850,60 +850,60 @@ paths:
         :rtype: int
         """
         print("=" * SEPARATOR_WIDTH)
-        print("  Self-Evolving Agent - Quick Start")
+        print("  Self-Evolving Agent - 快速体验")
         print("  30秒体验自驱进化 Agent 系统")
         print("=" * SEPARATOR_WIDTH)
         print()
 
         # Step 1: 健康检查
-        print("[1/4] Health Check (doctor)")
+        print("[1/4] 健康检查 (doctor)")
         print("-" * SEPARATOR_WIDTH)
         doctor_args = argparse.Namespace(config=args.config)
         doctor_ret = self.cmd_doctor(doctor_args)
         if doctor_ret != 0:
-            print("\nHealth check failed. Please fix the issues above before continuing.")
+            print("\n健康检查失败，请先修复上述问题再继续。")
             return 1
         print()
 
         # Step 2: 初始化配置（若不存在）
-        print("[2/4] Initialize Config (config init)")
+        print("[2/4] 初始化配置 (config init)")
         print("-" * SEPARATOR_WIDTH)
         config_path = args.config or DEFAULT_CONFIG_PATH
         if os.path.exists(config_path):
-            print(f"Config already exists: {config_path} (skip init)")
+            print(f"配置已存在: {config_path} (跳过初始化)")
         else:
             init_args = argparse.Namespace(config=config_path, action='init', force=False)
             init_ret = self.cmd_config(init_args)
             if init_ret != 0:
-                print("\nConfig init failed.")
+                print("\n配置初始化失败。")
                 return 1
         print()
 
         # Step 3: 执行单次循环
-        print("[3/4] Run Single Cycle (cycle)")
+        print("[3/4] 执行单次循环 (cycle)")
         print("-" * SEPARATOR_WIDTH)
         cycle_args = argparse.Namespace(config=config_path, json=False)
         cycle_ret = self.cmd_cycle(cycle_args)
         if cycle_ret != 0:
-            print("\nCycle execution failed.")
+            print("\n循环执行失败。")
             return 1
         print()
 
         # Step 4: 查看状态
-        print("[4/4] Show Status (status)")
+        print("[4/4] 查看状态 (status)")
         print("-" * SEPARATOR_WIDTH)
         status_args = argparse.Namespace(config=config_path, json=False)
         status_ret = self.cmd_status(status_args)
         if status_ret != 0:
-            print("\nStatus query failed.")
+            print("\n状态查询失败。")
             return 1
         print()
 
         print("=" * SEPARATOR_WIDTH)
-        print("  Quick Start Complete!")
+        print("  快速体验完成！")
         print("  系统已成功运行一个完整周期。")
         print()
-        print("  Next steps:")
+        print("  后续步骤:")
         print("    - 持续运行: self-evolving-agent start --cycles 10")
         print("    - 查看日志: self-evolving-agent logs --lines 20")
         print("    - 查看文档: README.md")
@@ -1522,7 +1522,7 @@ def main() -> int:
         description="Self-Evolving Agent CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
+示例:
   self-evolving-agent doctor                  # 健康检查
   self-evolving-agent config init             # 初始化配置
   self-evolving-agent start --cycles 10       # 启动运行10个周期
