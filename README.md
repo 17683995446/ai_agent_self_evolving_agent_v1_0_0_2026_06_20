@@ -127,6 +127,29 @@ self-evolving-agent dashboard --port 8080
 
 三套预置配置位于 `config/` 目录：`config.dev.yaml`（开发）、`config.test.yaml`（测试）、`config.prod.yaml`（生产）。
 
+## 扩展开发
+
+系统提供 8 个扩展点，支持自定义技能、任务、预测模型、传感器、事件处理等。详见 **[插件接入指南](docs/PLUGIN_GUIDE.md)**。
+
+快速扩展示例：
+
+```python
+# 注册自定义技能
+from src.skills.skill import Skill
+from src.skills.skill_registry import SkillRegistry
+
+registry = SkillRegistry()
+registry.register(Skill(
+    name="my_skill",
+    description="自定义技能",
+    capabilities=["custom"],
+    action=lambda task: {"result": "done"},
+))
+
+# 添加自定义预测模型（工厂模式）
+# 详见 docs/PLUGIN_GUIDE.md 第 3 节
+```
+
 ## 项目结构
 
 ```
