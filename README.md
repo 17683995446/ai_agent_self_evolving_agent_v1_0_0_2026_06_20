@@ -79,6 +79,7 @@ self-evolving-agent <command> [options]
 | `doctor` | 健康检查（依赖/配置/路径） | `doctor` |
 | `logs` | 查看最近日志 | `logs --lines 20` |
 | `quickstart` | 一键体验（doctor+init+cycle+status） | `quickstart` |
+| `dashboard` | 启动监控仪表盘 Web UI | `dashboard --port 8080` |
 | `config show` | 查看当前配置 | `config show` |
 | `config validate` | 校验配置合法性 | `config validate` |
 | `config init` | 生成默认配置文件 | `config init --force` |
@@ -94,6 +95,17 @@ self-evolving-agent <command> [options]
 **环境变量**：
 
 - `AGENT_ENV`：选择配置环境，`dev` / `test` / `prod`（默认 `prod`）
+
+### 监控仪表盘
+
+启动 Web 仪表盘，通过浏览器实时查看 Agent 运行状态（MAE、成功率、记忆样本、历史趋势图）：
+
+```bash
+self-evolving-agent dashboard --port 8080
+# 浏览器访问 http://127.0.0.1:8080
+```
+
+仪表盘读取 `metrics.json` 和快照索引，无需 Agent 在线即可查看历史数据。按 `Ctrl+C` 停止。
 
 ## 配置说明
 

@@ -9,6 +9,7 @@ import logging
 import os
 import signal
 import sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, List, Optional, Tuple
 
 # 确保src在路径中
@@ -905,6 +906,166 @@ paths:
             logger.error("Failed to read log file %s: %s", log_file, e)
             return []
 
+    def cmd_dashboard(self, args: argparse.Namespace) -> int:
+        """启动监控仪表盘 Web UI。
+
+        读取 metrics.json 实时展示 Agent 运行状态，无需 Agent 在线。
+        用户通过浏览器访问 http://host:port 查看仪表盘。
+
+        :param args: 命令行参数，支持 --host 和 --port。
+        :type args: argparse.Namespace
+        :return: 成功启动并正常退出返回0，端口占用等错误返回1。
+        :rtype: int
+        """
+        config_path = args.config or DEFAULT_CONFIG_PATH
+        if not self._validate_config_path(config_path):
+            return 1
+
+        data_dir = self._resolve_data_dir(config_path)
+        host = args.host
+        port = args.port
+
+        try:
+            from src.dashboard.server import _DASHBOARD_HTML
+        except ImportError:
+            logger.error("Dashboard module not found.")
+            return 1
+
+        handler = self._create_standalone_handler(
+            _DASHBOARD_HTML, config_path, data_dir
+        )
+
+        print("Self-Evolving Agent Dashboard")
+        print(f"  URL:          http://{host}:{port}")
+        print(f"  Config:       {config_path}")
+        print(f"  Data dir:     {data_dir}")
+        print("  Press Ctrl+C to stop.")
+        print()
+
+        try:
+            server = HTTPServer((host, port), handler)
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print("\nDashboard stopped.")
+            server.shutdown()
+            server.server_close()
+        except OSError as e:
+            print(f"Failed to start dashboard on {host}:{port}: {e}")
+            print("Hint: Port may be in use. Try a different port with --port.")
+            return 1
+        return 0
+
+    def _resolve_data_dir(self, config_path: str) -> str:
+        """从配置文件解析数据目录。"""
+        try:
+            import yaml
+            with open(config_path, 'r', encoding='utf-8') as f:
+                cfg = yaml.safe_load(f) or {}
+            return cfg.get('paths', {}).get('data_dir', 'data')
+        except Exception:
+            return 'data'
+
+    def _create_standalone_handler(
+        self, html_template: str, config_path: str, data_dir: str
+    ) -> type:
+        """创建独立的 dashboard HTTP 请求处理器类型。
+
+        :param html_template: 仪表盘 HTML 模板字符串。
+        :param config_path: 配置文件路径。
+        :param data_dir: 数据目录路径。
+        :return: BaseHTTPRequestHandler 子类。
+        """
+        cli_ref = self
+        config_ref = config_path
+
+        class StandaloneDashboardHandler(BaseHTTPRequestHandler):
+            """独立仪表盘处理器：每次请求读取 metrics.json 获取实时数据。"""
+
+            def do_GET(self):
+                route = self._get_route()
+                route()
+
+            def _get_route(self):
+                if self.path == '/':
+                    return self._serve_html
+                elif self.path == '/api/data':
+                    return self._serve_data
+                elif self.path == '/api/health':
+                    return self._serve_health
+                return self._send_404
+
+            def _serve_html(self):
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(html_template.encode('utf-8'))
+
+            def _serve_data(self):
+                stats = cli_ref._get_lightweight_status(config_ref)
+                history = cli_ref._read_history_from_snapshots()
+                data = {
+                    'cycles': stats.get('cycle_count', 0),
+                    'recent_mae': stats.get('recent_mae', 0.0),
+                    'success_rate': stats.get('recent_success_rate', 0.0),
+                    'reward': 0.0,
+                    'memory_samples': stats.get('memory_samples', 0),
+                    'task_pool': {'total_tasks': 0},
+                    'predictions': {},
+                    'current_state': 'ACTIVE' if stats.get('running') else 'IDLE',
+                    'history': history,
+                }
+                payload = json.dumps(data, default=str).encode('utf-8')
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def _serve_health(self):
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'ok'}).encode('utf-8'))
+
+            def _send_404(self):
+                self.send_error(404)
+
+            def log_message(self, format, *args):
+                pass
+
+        return StandaloneDashboardHandler
+
+    def _read_history_from_snapshots(self) -> List[Dict[str, Any]]:
+        """从快照索引读取历史周期数据，供仪表盘趋势图展示。
+
+        快照索引条目格式：{id, tag, timestamp, filepath, metrics:{mae,coverage,eff_score}}
+
+        :return: 历史记录列表，每项包含 cycle/mae/reward/duration。
+        :rtype: List[Dict[str, Any]]
+        """
+        index_path = os.path.join('snapshots', 'index.json')
+        if not os.path.exists(index_path):
+            return []
+        try:
+            with open(index_path, 'r', encoding='utf-8') as f:
+                index = json.load(f)
+            if not isinstance(index, list):
+                return []
+            history: List[Dict[str, Any]] = []
+            for i, entry in enumerate(index[-50:]):
+                if not isinstance(entry, dict):
+                    continue
+                metrics = entry.get('metrics', {}) if isinstance(entry.get('metrics'), dict) else {}
+                history.append({
+                    'cycle': i + 1,
+                    'mae': metrics.get('mae', 0.0),
+                    'reward': metrics.get('eff_score', 0.0),
+                    'duration': 0.0,
+                })
+            return history
+        except (json.JSONDecodeError, OSError):
+            return []
+
 
 def _resolve_config_path(args_config: Optional[str]) -> str:
     if args_config:
@@ -973,6 +1134,14 @@ Examples:
     # quickstart
     subparsers.add_parser('quickstart', help='One-click demo: doctor + init + cycle + status')
 
+    # dashboard
+    dashboard_parser = subparsers.add_parser(
+        'dashboard', help='Start monitoring dashboard web UI')
+    dashboard_parser.add_argument('--host', default='127.0.0.1',
+                                  help='Dashboard host (default: 127.0.0.1)')
+    dashboard_parser.add_argument('--port', '-p', type=int, default=8080,
+                                  help='Dashboard port (default: 8080)')
+
     args = parser.parse_args()
 
     if not args.command:
@@ -990,6 +1159,7 @@ Examples:
         'doctor': cli.cmd_doctor,
         'logs': cli.cmd_logs,
         'quickstart': cli.cmd_quickstart,
+        'dashboard': cli.cmd_dashboard,
     }
 
     handler = command_map.get(args.command)
