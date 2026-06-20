@@ -21,6 +21,72 @@ from src.core.constants import DEFAULT_CONFIG_PATH
 logger = logging.getLogger(__name__)
 
 
+class ColorOutput:
+    """终端彩色输出工具，自动检测 TTY 并尊重 NO_COLOR 环境变量。
+
+    遵循 https://no-color.org/ 规范：设置 NO_COLOR 环境变量时禁用颜色。
+    输出非 TTY（如管道/重定向）时自动禁用颜色，避免 ANSI 转义码污染日志。
+    """
+
+    _RESET = '\033[0m'
+    _COLORS = {
+        'red': '\033[31m',
+        'green': '\033[32m',
+        'yellow': '\033[33m',
+        'blue': '\033[34m',
+        'cyan': '\033[36m',
+        'gray': '\033[90m',
+        'bold': '\033[1m',
+    }
+
+    def __init__(self):
+        self._enabled = self._detect_tty()
+
+    def _detect_tty(self) -> bool:
+        """检测是否应启用颜色输出。"""
+        if os.environ.get('NO_COLOR') is not None:
+            return False
+        return sys.stdout.isatty()
+
+    def disable(self) -> None:
+        """禁用颜色输出（由 --no-color 选项调用）。"""
+        self._enabled = False
+
+    def colorize(self, text: str, color: str) -> str:
+        """为文本添加颜色，未启用时返回原文。"""
+        if not self._enabled or color not in self._COLORS:
+            return text
+        return f"{self._COLORS[color]}{text}{self._RESET}"
+
+    def ok(self, text: str) -> str:
+        """绿色：成功状态。"""
+        return self.colorize(text, 'green')
+
+    def fail(self, text: str) -> str:
+        """红色：失败状态。"""
+        return self.colorize(text, 'red')
+
+    def warn(self, text: str) -> str:
+        """黄色：警告状态。"""
+        return self.colorize(text, 'yellow')
+
+    def info(self, text: str) -> str:
+        """青色：信息标题。"""
+        return self.colorize(text, 'cyan')
+
+    def bold(self, text: str) -> str:
+        """粗体。"""
+        return self.colorize(text, 'bold')
+
+    def is_enabled(self) -> bool:
+        """返回颜色是否启用。"""
+        return self._enabled
+
+
+# 全局颜色输出实例
+_color = ColorOutput()
+
+
 def _get_version() -> str:
     """获取项目版本号。
 
@@ -278,19 +344,37 @@ class AgentCLI(BaseAgentCLI):
 
     def _print_status(self, stats: Dict[str, Any]) -> None:
         print("=" * 40)
-        print("Agent Status")
+        print(_color.bold("Agent Status"))
         print("=" * 40)
         running = stats.get('running', False)
-        print(f"Running:          {'YES' if running else 'NO'}")
+        running_text = _color.ok('YES') if running else _color.warn('NO')
+        print(f"Running:          {running_text}")
         if stats.get('pid'):
             print(f"PID:              {stats['pid']}")
         print(f"Cycles Completed: {stats.get('cycle_count', 0)}")
         print(f"Memory Samples:   {stats.get('memory_samples', 0)}")
         mae = stats.get('recent_mae', 0.0)
         sr = stats.get('recent_success_rate', 0.0)
-        print(f"Recent MAE:       {mae:.4f}" if isinstance(mae, (int, float)) else f"Recent MAE:       {mae}")
+        if isinstance(mae, (int, float)):
+            mae_text = f"{mae:.4f}"
+            if mae < 0.05:
+                mae_text = _color.ok(mae_text)
+            elif mae < 0.15:
+                mae_text = _color.warn(mae_text)
+            else:
+                mae_text = _color.fail(mae_text)
+            print(f"Recent MAE:       {mae_text}")
+        else:
+            print(f"Recent MAE:       {mae}")
         if isinstance(sr, (int, float)):
-            print(f"Success Rate:     {sr:.2%}")
+            sr_text = f"{sr:.2%}"
+            if sr > 0.7:
+                sr_text = _color.ok(sr_text)
+            elif sr > 0.4:
+                sr_text = _color.warn(sr_text)
+            else:
+                sr_text = _color.fail(sr_text)
+            print(f"Success Rate:     {sr_text}")
         else:
             print(f"Success Rate:     {sr}")
         print(f"Config:           {stats.get('config_path', '-')}")
@@ -328,13 +412,13 @@ class AgentCLI(BaseAgentCLI):
         """
         errors = self._validate_config_fields(config_path)
         if not errors:
-            print(f"Configuration is valid: {config_path}")
+            print(_color.ok(f"Configuration is valid: {config_path}"))
             return 0
-        print(f"Configuration validation failed ({len(errors)} errors):")
+        print(_color.fail(f"Configuration validation failed ({len(errors)} errors):"))
         for err in errors:
-            print(f"  - {err}")
+            print(f"  - {_color.fail(err)}")
         print()
-        print("Fix hints:")
+        print(_color.info("Fix hints:"))
         print("  - Run 'self-evolving-agent config init --force' to regenerate defaults")
         print("  - Check field types: weights must be numbers, paths must be strings")
         return 1
@@ -672,14 +756,30 @@ paths:
         }
 
     def _print_cycle_result(self, result: Dict[str, Any], verbose: bool = False) -> None:
-        print(f"Cycle {result['cycle']} completed in {result['duration_seconds']:.4f}s")
+        print(f"Cycle {_color.bold(str(result['cycle']))} "
+              f"completed in {result['duration_seconds']:.4f}s")
         print(f"Errors: {result['errors']}")
-        print(f"Reward: {result['reward']['total_reward']:.4f}")
-        print(f"Execution: {result['execution']['status']}")
-        print(f"Safety: emergency={result['safety']['emergency_mode']}")
+        reward_val = result['reward']['total_reward']
+        reward_text = f"{reward_val:.4f}"
+        if reward_val > 0.5:
+            reward_text = _color.ok(reward_text)
+        elif reward_val < 0.2:
+            reward_text = _color.fail(reward_text)
+        else:
+            reward_text = _color.warn(reward_text)
+        print(f"Reward: {reward_text}")
+        exec_status = result['execution']['status']
+        if exec_status == 'executed':
+            exec_text = _color.ok(exec_status)
+        else:
+            exec_text = _color.warn(exec_status)
+        print(f"Execution: {exec_text}")
+        emergency = result['safety']['emergency_mode']
+        safety_text = _color.fail(f"emergency={emergency}") if emergency else _color.ok(f"emergency={emergency}")
+        print(f"Safety: {safety_text}")
         if verbose:
             print()
-            print("--- Verbose Details ---")
+            print(_color.info("--- Verbose Details ---"))
             reward = result.get('reward', {})
             print(f"  Reward breakdown: safe={reward.get('safe_reward', 0):.4f}, "
                   f"gain={reward.get('gain_reward', 0):.4f}, eff={reward.get('eff_reward', 0):.4f}")
@@ -784,15 +884,20 @@ paths:
         passed = sum(1 for _, ok, _ in checks if ok)
         total = len(checks)
         for name, ok, msg in checks:
-            status = "[OK]  " if ok else "[FAIL]"
+            if ok:
+                status = _color.ok("[OK]  ")
+            else:
+                status = _color.fail("[FAIL]")
             print(f"  {status} {name}: {msg}")
 
         print("=" * 50)
-        print(f"Result: {passed}/{total} checks passed")
+        result_text = f"Result: {passed}/{total} checks passed"
         if passed == total:
-            print("All checks passed. System is ready.")
+            print(_color.ok(result_text))
+            print(_color.ok("All checks passed. System is ready."))
             return 0
-        print("Some checks failed. Please review the issues above.")
+        print(_color.fail(result_text))
+        print(_color.fail("Some checks failed. Please review the issues above."))
         return 1
 
     def _check_python_version(self) -> List[Tuple[str, bool, str]]:
@@ -1106,9 +1211,13 @@ paths:
         print()
         print("-" * 50)
         if dry_run:
-            print(f"Would free approximately {self._format_size(total_freed)}")
+            print(_color.warn(f"Would free approximately {self._format_size(total_freed)}"))
         else:
-            print(f"Freed approximately {self._format_size(total_freed)}")
+            freed_text = f"Freed approximately {self._format_size(total_freed)}"
+            if total_freed > 0:
+                print(_color.ok(freed_text))
+            else:
+                print(freed_text)
         print("=" * 50)
         return 0
 
@@ -1321,6 +1430,8 @@ Examples:
     parser.add_argument('--json', action='store_true', help='Output in JSON format')
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Verbose output (detailed cycle info)')
+    parser.add_argument('--no-color', action='store_true',
+                        help='Disable colored output')
 
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
@@ -1377,6 +1488,9 @@ Examples:
                                 help='Show what would be cleaned without deleting')
 
     args = parser.parse_args()
+
+    if getattr(args, 'no_color', False):
+        _color.disable()
 
     if not args.command:
         parser.print_help()

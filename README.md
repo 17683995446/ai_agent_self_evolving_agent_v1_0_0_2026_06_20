@@ -92,10 +92,12 @@ self-evolving-agent <command> [options]
 - `--config, -c`：指定配置文件路径（默认按 `AGENT_ENV` 环境变量选择 dev/test/prod）
 - `--json`：以 JSON 格式输出（适用于 `status`、`cycle`）
 - `--verbose, -v`：详细输出模式（显示周期分解详情，适用于 `cycle`）
+- `--no-color`：禁用彩色输出（TTY 环境下自动启用颜色，遵循 `NO_COLOR` 环境变量规范）
 
 **环境变量**：
 
 - `AGENT_ENV`：选择配置环境，`dev` / `test` / `prod`（默认 `prod`）
+- `NO_COLOR`：设置此变量时禁用彩色输出（遵循 [no-color.org](https://no-color.org/) 规范）
 
 ### 监控仪表盘
 
