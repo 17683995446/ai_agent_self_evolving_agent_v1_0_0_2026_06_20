@@ -305,6 +305,8 @@ class AgentCLI(BaseAgentCLI):
             return self._config_validate(config_path)
         elif args.action == 'init':
             return self._config_init(config_path, args.force)
+        elif args.action == 'wizard':
+            return self.cmd_config_wizard(args)
         return 0
 
     def _config_show(self, config_path: str) -> int:
@@ -440,6 +442,96 @@ class AgentCLI(BaseAgentCLI):
             if not isinstance(level, str) or level.upper() not in valid_levels:
                 errors.append(f"logging.level must be one of {valid_levels}, got {level}")
         return errors
+
+    def cmd_config_wizard(self, args: argparse.Namespace) -> int:
+        """交互式配置向导：通过问答生成定制化配置。
+
+        :param args: 命令行参数。
+        :type args: argparse.Namespace
+        :return: 成功返回0，用户取消返回1。
+        :rtype: int
+        """
+        config_path = args.config or DEFAULT_CONFIG_PATH
+        print("=" * 55)
+        print("  Self-Evolving Agent - Configuration Wizard")
+        print("  交互式配置向导，按 Ctrl+C 取消")
+        print("=" * 55)
+        print()
+
+        try:
+            cfg = self._run_wizard_questions()
+        except KeyboardInterrupt:
+            print("\nWizard cancelled.")
+            return 1
+
+        if os.path.exists(config_path):
+            print(f"\nConfig already exists: {config_path}")
+            confirm = input("Overwrite? (y/N): ").strip().lower()
+            if confirm != 'y':
+                print("Cancelled.")
+                return 0
+
+        os.makedirs(os.path.dirname(config_path) or '.', exist_ok=True)
+        import yaml
+        with open(config_path, 'w', encoding='utf-8') as f:
+            f.write(self._default_config())
+            f.write('\n# === Wizard Customized Settings ===\n')
+            yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+        print(f"\nConfig created: {config_path}")
+        print("Next steps:")
+        print(f"  1. Run 'self-evolving-agent -c {config_path} config validate'")
+        print(f"  2. Run 'self-evolving-agent -c {config_path} doctor'")
+        print(f"  3. Run 'self-evolving-agent -c {config_path} start'")
+        return 0
+
+    def _run_wizard_questions(self) -> Dict[str, Any]:
+        """执行向导问答，返回用户定制的配置字典。"""
+        print("Choose a profile (affects resource limits and exploration):")
+        print("  1. conservative (CPU<=10%, memory<=10%, low exploration)")
+        print("  2. balanced     (CPU<=20%, memory<=20%, medium exploration) [default]")
+        print("  3. aggressive   (CPU<=50%, memory<=50%, high exploration)")
+        profile = input("Select [1/2/3]: ").strip() or '2'
+
+        profiles = {
+            '1': {'cpu': 10.0, 'mem': 10.0, 'explore': 0.2, 'name': 'conservative'},
+            '2': {'cpu': 20.0, 'mem': 20.0, 'explore': 0.3, 'name': 'balanced'},
+            '3': {'cpu': 50.0, 'mem': 50.0, 'explore': 0.5, 'name': 'aggressive'},
+        }
+        p = profiles.get(profile, profiles['2'])
+        print(f"  -> Selected: {p['name']}")
+        print()
+
+        log_level = input("Log level [DEBUG/INFO/WARNING/ERROR] (default INFO): ").strip().upper() or 'INFO'
+        print(f"  -> Log level: {log_level}")
+        print()
+
+        data_dir = input("Data directory (default 'data'): ").strip() or 'data'
+        print(f"  -> Data dir: {data_dir}")
+        print()
+
+        return {
+            'resource_limits': {
+                'max_cpu_percent': p['cpu'],
+                'max_mem_percent': p['mem'],
+                'max_db_size_mb': 500,
+                'max_snapshot_count': 10,
+            },
+            'exploration': {
+                'base_ratio': p['explore'],
+                'stable_threshold': 0.05,
+                'emergency_ratio': 0.1,
+                'novel_ratio': 0.4,
+            },
+            'logging': {
+                'level': log_level,
+            },
+            'paths': {
+                'data_dir': data_dir,
+                'snapshot_dir': 'snapshots',
+                'log_dir': 'logs',
+            },
+        }
 
     def _config_init(self, config_path: str, force: bool) -> int:
         if os.path.exists(config_path) and not force:
@@ -841,7 +933,7 @@ Examples:
 
     # config
     config_parser = subparsers.add_parser('config', help='Manage configuration')
-    config_parser.add_argument('action', choices=['show', 'validate', 'init'])
+    config_parser.add_argument('action', choices=['show', 'validate', 'init', 'wizard'])
     config_parser.add_argument('--force', action='store_true', help='Force overwrite')
 
     # stop

@@ -82,6 +82,7 @@ self-evolving-agent <command> [options]
 | `config show` | 查看当前配置 | `config show` |
 | `config validate` | 校验配置合法性 | `config validate` |
 | `config init` | 生成默认配置文件 | `config init --force` |
+| `config wizard` | 交互式配置向导 | `config wizard` |
 
 **全局选项**：
 
