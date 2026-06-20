@@ -271,35 +271,51 @@ class CustomStateVector(BaseStateVector):
 
 ## 5. 事件总线（Event Bus）
 
-事件总线支持发布-订阅模式，支持通配符订阅。
+事件总线支持发布-订阅模式，基于异步 `asyncio` 实现。订阅器需为 `async` 函数，事件通过 `Event` 对象传递。
 
 ### 5.1 订阅事件
 
 ```python
-from src.core.event_bus import EventBus
+import asyncio
+from src.core.event_bus import EventBus, Event
 
 bus = EventBus()
 
-# 订阅特定事件
-bus.subscribe("cycle_completed", lambda event: print(f"Cycle done: {event.data}"))
+# 订阅特定事件：handler 必须是 async 函数，接收 Event 对象
+async def on_cycle_completed(event: Event) -> None:
+    print(f"Cycle done: {event.payload}")  # 注意：字段是 payload，不是 data
+
+bus.subscribe("cycle_completed", on_cycle_completed)
 
 # 通配符订阅（接收所有事件）
-bus.subscribe("*", lambda event: log_event(event))
+async def log_all_events(event: Event) -> None:
+    log_event(event)
+
+bus.subscribe("*", log_all_events)
 ```
 
 ### 5.2 发布事件
 
 ```python
-from src.core.event_bus import EventBus
+import asyncio
+from src.core.event_bus import EventBus, Event
 
 bus = EventBus()
-bus.publish("custom_event", {"key": "value"})
+
+async def main() -> None:
+    # publish 是 async 方法，接收单个 Event 对象
+    event = Event(type="custom_event", payload={"key": "value"}, source="my_plugin")
+    await bus.publish(event)
+
+asyncio.run(main())
 ```
 
 ### 5.3 取消订阅
 
 ```python
-handler = lambda event: process(event)
+async def handler(event: Event) -> None:
+    process(event)
+
 bus.subscribe("cycle_completed", handler)
 # ...
 bus.unsubscribe("cycle_completed", handler)
@@ -322,7 +338,7 @@ def email_handler(alert):
     """告警触发时发送邮件。"""
     send_email(
         to="ops@example.com",
-        subject=f"Alert: {alert.level}",
+        subject=f"Alert: {alert.severity}",  # 注意：字段是 severity，不是 level
         body=alert.message,
     )
 

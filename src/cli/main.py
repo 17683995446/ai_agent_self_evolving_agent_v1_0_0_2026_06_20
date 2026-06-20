@@ -857,7 +857,7 @@ paths:
 
         # Step 1: 健康检查
         print("[1/4] Health Check (doctor)")
-        print("-" * 40)
+        print("-" * SEPARATOR_WIDTH)
         doctor_args = argparse.Namespace(config=args.config)
         doctor_ret = self.cmd_doctor(doctor_args)
         if doctor_ret != 0:
@@ -867,7 +867,7 @@ paths:
 
         # Step 2: 初始化配置（若不存在）
         print("[2/4] Initialize Config (config init)")
-        print("-" * 40)
+        print("-" * SEPARATOR_WIDTH)
         config_path = args.config or DEFAULT_CONFIG_PATH
         if os.path.exists(config_path):
             print(f"Config already exists: {config_path} (skip init)")
@@ -881,7 +881,7 @@ paths:
 
         # Step 3: 执行单次循环
         print("[3/4] Run Single Cycle (cycle)")
-        print("-" * 40)
+        print("-" * SEPARATOR_WIDTH)
         cycle_args = argparse.Namespace(config=config_path, json=False)
         cycle_ret = self.cmd_cycle(cycle_args)
         if cycle_ret != 0:
@@ -891,7 +891,7 @@ paths:
 
         # Step 4: 查看状态
         print("[4/4] Show Status (status)")
-        print("-" * 40)
+        print("-" * SEPARATOR_WIDTH)
         status_args = argparse.Namespace(config=config_path, json=False)
         status_ret = self.cmd_status(status_args)
         if status_ret != 0:
@@ -1064,7 +1064,7 @@ paths:
         读取 metrics.json 实时展示 Agent 运行状态，无需 Agent 在线。
         用户通过浏览器访问 http://host:port 查看仪表盘。
 
-        :param args: 命令行参数，支持 --host/--port/--auth-token。
+        :param args: 命令行参数，支持 --host/--port/--auth-token/--auto-port。
         :type args: argparse.Namespace
         :return: 成功启动并正常退出返回0，端口占用等错误返回1。
         :rtype: int
@@ -1077,6 +1077,7 @@ paths:
         host = args.host
         port = args.port
         auth_token = args.auth_token
+        auto_port = getattr(args, 'auto_port', False)
 
         try:
             from src.dashboard.server import _DASHBOARD_HTML
@@ -1088,30 +1089,65 @@ paths:
             _DASHBOARD_HTML, config_path, data_dir, auth_token
         )
 
+        # 端口冲突时自动寻找可用端口（仅当 --auto-port 启用时）
+        actual_port = port
+        if auto_port:
+            actual_port = self._find_available_port(host, port)
+            if actual_port != port:
+                print(_color.warn(
+                    f"Port {port} is in use, using {actual_port} instead."
+                ))
+
         print("Self-Evolving Agent Dashboard")
-        print(f"  URL:          http://{host}:{port}")
+        print(f"  URL:          http://{host}:{actual_port}")
         print(f"  Config:       {config_path}")
         print(f"  Data dir:     {data_dir}")
         if auth_token:
             print(f"  Auth token:   {auth_token}")
-            print(f"  Access API with: curl -H 'X-Auth-Token: {auth_token}' http://{host}:{port}/api/data")
+            print(f"  Access API with: curl -H 'X-Auth-Token: {auth_token}' http://{host}:{actual_port}/api/data")
         else:
             print("  Auth:         disabled (bind to 127.0.0.1 for safety)")
         print("  Press Ctrl+C to stop.")
         print()
 
         try:
-            server = HTTPServer((host, port), handler)
+            server = HTTPServer((host, actual_port), handler)
             server.serve_forever()
         except KeyboardInterrupt:
             print("\nDashboard stopped.")
             server.shutdown()
             server.server_close()
         except OSError as e:
-            print(f"Failed to start dashboard on {host}:{port}: {e}")
-            print("Hint: Port may be in use. Try a different port with --port.")
+            print(f"Failed to start dashboard on {host}:{actual_port}: {e}")
+            if not auto_port:
+                print("Hint: Port may be in use. Try a different port with --port, "
+                      "or use --auto-port to find an available one automatically.")
             return 1
         return 0
+
+    @staticmethod
+    def _find_available_port(host: str, preferred_port: int) -> int:
+        """查找可用端口。优先使用 preferred_port，被占用则由 OS 分配。
+
+        :param host: 绑定的主机。
+        :type host: str
+        :param preferred_port: 优先使用的端口。
+        :type preferred_port: int
+        :return: 可用端口号。
+        :rtype: int
+        """
+        import socket
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind((host, preferred_port))
+                return preferred_port
+        except OSError:
+            pass
+        # 由 OS 分配可用端口
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind((host, 0))
+            return s.getsockname()[1]
 
     def _resolve_data_dir(self, config_path: str) -> str:
         """从配置文件解析数据目录。"""
@@ -1546,6 +1582,8 @@ Examples:
                                   help='Dashboard port (default: 8080)')
     dashboard_parser.add_argument('--auth-token', default=None,
                                   help='Auth token for API access (X-Auth-Token header)')
+    dashboard_parser.add_argument('--auto-port', action='store_true',
+                                  help='Automatically find an available port if the specified one is in use')
 
     # cleanup
     cleanup_parser = subparsers.add_parser(
