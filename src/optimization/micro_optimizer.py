@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import abc
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, TYPE_CHECKING
 import numpy as np
 
-from src.prediction.base_predictor import AdaptiveExponentialSmoother
-from src.prediction.multi_predictor import MultiPredictor
+if TYPE_CHECKING:
+    from src.prediction.base_predictor import AdaptiveExponentialSmoother
+    from src.prediction.multi_predictor import MultiPredictor
 
 
 class BaseMicroOptimizer(abc.ABC):

@@ -10,7 +10,7 @@ import atexit
 import logging
 from typing import Optional, Callable, List, Any, Dict
 
-from src.core.constants import DAEMON_PID_FILE, DAEMON_WORKING_DIR, DAEMON_UMASK
+from .constants import DAEMON_PID_FILE, DAEMON_WORKING_DIR, DAEMON_UMASK
 
 logger = logging.getLogger(__name__)
 

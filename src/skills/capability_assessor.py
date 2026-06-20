@@ -12,7 +12,7 @@
 
 from typing import Any, Dict, List, Optional, Set
 
-from src.skills.skill_registry import SkillRegistry
+from .skill_registry import SkillRegistry
 
 
 class CapabilityAssessor:

@@ -8,8 +8,8 @@ import threading
 from typing import Dict, Any, Optional, Tuple
 from collections import deque
 
-from src.core.config import Config
-from src.core.constants import DEFAULT_CONFIG_PATH
+from .config import Config
+from .constants import DEFAULT_CONFIG_PATH
 from src.perception.state_vector import StateVector
 from src.prediction.layered_predictor import LowLevelPredictor, MidLevelPredictor, HighLevelPredictor
 from src.prediction.error_evaluator import ErrorEvaluator

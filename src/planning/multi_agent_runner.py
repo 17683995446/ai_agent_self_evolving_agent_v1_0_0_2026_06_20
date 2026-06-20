@@ -4,8 +4,8 @@ from src.task.task_definition import Task
 from src.multi_agent.orchestrator import MultiAgentOrchestrator
 from src.skills.skill_registry import SkillRegistry
 from src.skills.skill_learner import SkillLearner
-from src.planning.long_task_planner import LongTaskPlanner
-from src.planning.long_task_reviewer import LongTaskReviewer
+from .long_task_planner import LongTaskPlanner
+from .long_task_reviewer import LongTaskReviewer
 from src.memory.long_term import LongTermMemory
 from src.monitoring.performance_tracker import PerformanceTracker
 
