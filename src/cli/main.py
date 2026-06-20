@@ -7,12 +7,13 @@ import sys
 import os
 import json
 import signal
-from typing import Optional
+from typing import Optional, Dict, Any
 
 # 确保src在路径中
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.core.agent_loop import AgentLoop
+from src.core.constants import DEFAULT_CONFIG_PATH
 
 
 class BaseAgentCLI(abc.ABC):
@@ -67,7 +68,7 @@ class AgentCLI(BaseAgentCLI):
     def cmd_start(self, args: argparse.Namespace) -> int:
         """启动Agent主循环"""
         self._setup_signal_handlers()
-        config_path = args.config or "config/config.yaml"
+        config_path = args.config or DEFAULT_CONFIG_PATH
         if not self._validate_config_path(config_path):
             return 1
         return self._run_agent(config_path, args)
@@ -98,7 +99,7 @@ class AgentCLI(BaseAgentCLI):
 
     def cmd_stop(self, args: argparse.Namespace) -> int:
         """停止Agent主循环"""
-        config_path = args.config or "config/config.yaml"
+        config_path = args.config or DEFAULT_CONFIG_PATH
         if not self._validate_config_path(config_path):
             return 1
         agent = AgentLoop(config_path)
@@ -122,7 +123,7 @@ class AgentCLI(BaseAgentCLI):
 
     def cmd_status(self, args: argparse.Namespace) -> int:
         """查询Agent状态"""
-        config_path = args.config or "config/config.yaml"
+        config_path = args.config or DEFAULT_CONFIG_PATH
         if not self._validate_config_path(config_path):
             return 1
         stats = self._get_agent_stats(config_path)
@@ -154,7 +155,7 @@ class AgentCLI(BaseAgentCLI):
 
     def cmd_config(self, args: argparse.Namespace) -> int:
         """配置管理"""
-        config_path = args.config or "config/config.yaml"
+        config_path = args.config or DEFAULT_CONFIG_PATH
         if args.action == 'show':
             return self._config_show(config_path)
         elif args.action == 'validate':
@@ -264,7 +265,7 @@ paths:
 
     def cmd_cycle(self, args: argparse.Namespace) -> int:
         """执行单次循环（用于调试和测试）"""
-        config_path = args.config or "config/config.yaml"
+        config_path = args.config or DEFAULT_CONFIG_PATH
         if not self._validate_config_path(config_path):
             return 1
         result = self._run_single_cycle(config_path)
