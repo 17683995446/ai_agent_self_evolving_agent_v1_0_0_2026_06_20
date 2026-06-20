@@ -9,6 +9,7 @@ import logging
 import os
 import signal
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -179,9 +180,18 @@ class AgentCLI(BaseAgentCLI):
             return 1
         pid_path = os.path.join(self.agent.cfg.get('paths', {}).get('data_dir', 'data'), 'agent.pid')
         self._write_pid_file(pid_path)
-        logger.info("Agent initialized. Running %s cycles...", args.cycles)
+        max_cycles = args.cycles
+        if max_cycles is not None:
+            print(f"Agent started: running {max_cycles} cycles "
+                  f"(interval={args.interval}s)")
+        else:
+            print("Agent started: running indefinitely (Ctrl+C to stop)")
+        print()
+        self._progress_start = time.time()
+        self._progress_max = max_cycles
         try:
-            self.agent.run(max_cycles=args.cycles, sleep_interval=args.interval)
+            self.agent.run(max_cycles=max_cycles, sleep_interval=args.interval,
+                           progress_callback=self._print_progress)
         except KeyboardInterrupt:
             logger.info("Agent stopped by user (Ctrl+C)")
         except Exception as e:
@@ -193,8 +203,40 @@ class AgentCLI(BaseAgentCLI):
             self._remove_pid_file(pid_path)
             if self.agent:
                 self.agent.stop()
-        logger.info("Agent stopped.")
+        print()
+        print("Agent stopped.")
         return 0
+
+    def _print_progress(self, result: Dict[str, Any], cycle_count: int,
+                        max_cycles: Optional[int]) -> None:
+        """每周期结束后打印进度信息。
+
+        :param result: 周期结果字典。
+        :param cycle_count: 已完成的周期数。
+        :param max_cycles: 最大周期数（None 表示无限）。
+        """
+        elapsed = time.time() - self._progress_start
+        reward = result.get('reward', {}).get('total_reward', 0.0)
+        mae = 0.0
+        errors = result.get('errors', {})
+        if isinstance(errors, dict) and errors:
+            mae = sum(abs(v) for v in errors.values()) / len(errors)
+
+        if max_cycles is not None and max_cycles > 0:
+            progress = cycle_count / max_cycles
+            bar_width = 20
+            filled = int(bar_width * progress)
+            bar = '#' * filled + '-' * (bar_width - filled)
+            pct = progress * 100
+            eta = (elapsed / cycle_count * (max_cycles - cycle_count)) if cycle_count > 0 else 0
+            print(f"\r  [{bar}] {pct:5.1f}%  "
+                  f"cycle {cycle_count}/{max_cycles}  "
+                  f"reward={reward:.4f}  mae={mae:.4f}  "
+                  f"elapsed={elapsed:.1f}s  eta={eta:.1f}s", end='', flush=True)
+        else:
+            print(f"\r  cycle {cycle_count}  "
+                  f"reward={reward:.4f}  mae={mae:.4f}  "
+                  f"elapsed={elapsed:.1f}s", end='', flush=True)
 
     def cmd_stop(self, args: argparse.Namespace) -> int:
         """停止Agent主循环"""

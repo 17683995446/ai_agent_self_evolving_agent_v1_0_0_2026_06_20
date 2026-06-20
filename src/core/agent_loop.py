@@ -87,13 +87,17 @@ class BaseAgentLoop(abc.ABC):
 
     @abc.abstractmethod
     def run(self, max_cycles: Optional[int] = None,
-            sleep_interval: float = 1.0) -> None:
+            sleep_interval: float = 1.0,
+            progress_callback: Optional[Any] = None) -> None:
         """持续运行主循环。
 
         :param max_cycles: 最大周期数。
         :type max_cycles: Optional[int]
         :param sleep_interval: 周期间隔（秒）。
         :type sleep_interval: float
+        :param progress_callback: 每周期结束后的回调函数
+            (result, cycle_count, max_cycles)。
+        :type progress_callback: Optional[Any]
         :return: 无。
         :rtype: None
         :raises: 无。
@@ -688,20 +692,24 @@ class AgentLoop(BaseAgentLoop):
         logger.warning("Auto-rollback triggered to snapshot: %s", snapshot_path)
 
     def run(self, max_cycles: Optional[int] = None,
-            sleep_interval: float = 1.0) -> None:
+            sleep_interval: float = 1.0,
+            progress_callback: Optional[Any] = None) -> None:
         """持续运行主循环。
 
         :param max_cycles: 最大周期数。
         :type max_cycles: Optional[int]
         :param sleep_interval: 周期间隔（秒）。
         :type sleep_interval: float
+        :param progress_callback: 每周期结束后的回调函数
+            (result, cycle_count, max_cycles)。
+        :type progress_callback: Optional[Any]
         :return: 无。
         :rtype: None
         :raises: 无。
         """
         self._prepare_run()
         try:
-            self._run_cycles(max_cycles, sleep_interval)
+            self._run_cycles(max_cycles, sleep_interval, progress_callback)
         except KeyboardInterrupt:
             logger.info("Agent stopped by user")
         finally:
@@ -717,11 +725,17 @@ class AgentLoop(BaseAgentLoop):
             self.dashboard.set_alert_manager(self.alert_manager)
             self.dashboard.start()
 
-    def _run_cycles(self, max_cycles: Optional[int], sleep_interval: float) -> None:
+    def _run_cycles(self, max_cycles: Optional[int], sleep_interval: float,
+                    progress_callback: Optional[Any] = None) -> None:
         while self._running:
             try:
                 result = self.run_cycle()
                 logger.debug("Cycle %s completed in %ss", result['cycle'], result['duration_seconds'])
+                if progress_callback is not None:
+                    try:
+                        progress_callback(result, self._cycle_count, max_cycles)
+                    except Exception as cb_err:
+                        logger.debug("Progress callback error: %s", cb_err)
             except Exception as e:
                 # 修复阶段116发现的bug：单步异常不应崩溃整个主循环
                 logger.error("Cycle %s failed with exception: %s: %s", self._cycle_count, type(e).__name__, e, exc_info=True)
