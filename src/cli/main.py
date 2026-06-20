@@ -141,14 +141,104 @@ class AgentCLI(BaseAgentCLI):
         config_path = args.config or DEFAULT_CONFIG_PATH
         if not self._validate_config_path(config_path):
             return 1
-        stats = self._get_agent_stats(config_path)
+        stats = self._get_lightweight_status(config_path)
         if args.json:
             print(json.dumps(stats, indent=2))
         else:
             self._print_status(stats)
         return 0
 
+    def _get_lightweight_status(self, config_path: str) -> Dict[str, Any]:
+        """轻量级状态查询：不实例化 AgentLoop，直接读取配置/PID/DB。
+
+        :param config_path: 配置文件路径。
+        :type config_path: str
+        :return: 状态字典。
+        :rtype: Dict[str, Any]
+        """
+        import yaml
+        with open(config_path, 'r', encoding='utf-8') as f:
+            cfg = yaml.safe_load(f) or {}
+
+        paths = cfg.get('paths', {})
+        data_dir = paths.get('data_dir', 'data')
+        log_dir = paths.get('log_dir', 'logs')
+
+        # 检查运行状态（PID 文件）
+        pid_path = os.path.join(data_dir, 'agent.pid')
+        running = False
+        pid = None
+        if os.path.exists(pid_path):
+            try:
+                with open(pid_path, 'r') as f:
+                    pid = int(f.read().strip())
+                os.kill(pid, 0)  # 检查进程是否存在
+                running = True
+            except (ValueError, ProcessLookupError, PermissionError):
+                running = False
+
+        # 轻量读取记忆样本数（直接查 SQLite，不实例化 AgentLoop）
+        memory_samples = self._count_memory_samples(data_dir)
+
+        # 读取最近日志的 MAE 与成功率（从状态向量持久化文件，若存在）
+        recent_mae, recent_success_rate = self._read_recent_metrics(data_dir)
+
+        return {
+            'running': running,
+            'pid': pid,
+            'cycle_count': self._read_cycle_count(data_dir),
+            'memory_samples': memory_samples,
+            'recent_mae': recent_mae,
+            'recent_success_rate': recent_success_rate,
+            'config_path': config_path,
+            'log_dir': log_dir,
+        }
+
+    def _count_memory_samples(self, data_dir: str) -> int:
+        """直接查询 SQLite 获取样本数，不实例化 ShortTermMemory。"""
+        db_path = os.path.join(data_dir, 'memory.db')
+        if not os.path.exists(db_path):
+            return 0
+        try:
+            import sqlite3
+            conn = sqlite3.connect(db_path)
+            cursor = conn.execute('SELECT COUNT(*) FROM samples')
+            count = cursor.fetchone()[0]
+            conn.close()
+            return count
+        except sqlite3.Error:
+            return 0
+
+    def _read_cycle_count(self, data_dir: str) -> int:
+        """从快照索引读取周期数（轻量，不实例化 AgentLoop）。"""
+        index_path = os.path.join('snapshots', 'index.json')
+        if not os.path.exists(index_path):
+            return 0
+        try:
+            with open(index_path, 'r') as f:
+                index = json.load(f)
+            if isinstance(index, list) and index:
+                return max((s.get('cycle', 0) for s in index), default=0)
+            if isinstance(index, dict):
+                return index.get('cycle_count', 0)
+        except (json.JSONDecodeError, OSError):
+            pass
+        return 0
+
+    def _read_recent_metrics(self, data_dir: str) -> tuple:
+        """读取最近的 MAE 与成功率（从指标文件，若存在）。"""
+        metrics_path = os.path.join(data_dir, 'metrics.json')
+        if not os.path.exists(metrics_path):
+            return 0.0, 0.0
+        try:
+            with open(metrics_path, 'r') as f:
+                metrics = json.load(f)
+            return metrics.get('recent_mae', 0.0), metrics.get('recent_success_rate', 0.0)
+        except (json.JSONDecodeError, OSError):
+            return 0.0, 0.0
+
     def _get_agent_stats(self, config_path: str) -> Dict[str, Any]:
+        """完整状态查询（实例化 AgentLoop，保留以兼容旧调用）。"""
         agent = AgentLoop(config_path)
         stats = agent.get_stats()
         agent.stop()
@@ -158,14 +248,21 @@ class AgentCLI(BaseAgentCLI):
         print("=" * 40)
         print("Agent Status")
         print("=" * 40)
-        print(f"Cycles Completed: {stats['cycle_count']}")
-        print(f"Memory Samples:   {stats['memory_samples']}")
-        print(f"Recent MAE:       {stats['recent_mae']:.4f}")
-        print(f"Success Rate:     {stats['recent_success_rate']:.2%}")
-        print("-" * 40)
-        print("Task Pool:")
-        for key, value in stats['task_pool'].items():
-            print(f"  {key}: {value}")
+        running = stats.get('running', False)
+        print(f"Running:          {'YES' if running else 'NO'}")
+        if stats.get('pid'):
+            print(f"PID:              {stats['pid']}")
+        print(f"Cycles Completed: {stats.get('cycle_count', 0)}")
+        print(f"Memory Samples:   {stats.get('memory_samples', 0)}")
+        mae = stats.get('recent_mae', 0.0)
+        sr = stats.get('recent_success_rate', 0.0)
+        print(f"Recent MAE:       {mae:.4f}" if isinstance(mae, (int, float)) else f"Recent MAE:       {mae}")
+        if isinstance(sr, (int, float)):
+            print(f"Success Rate:     {sr:.2%}")
+        else:
+            print(f"Success Rate:     {sr}")
+        print(f"Config:           {stats.get('config_path', '-')}")
+        print(f"Log Dir:          {stats.get('log_dir', '-')}")
         print("=" * 40)
 
     def cmd_config(self, args: argparse.Namespace) -> int:
@@ -413,6 +510,48 @@ paths:
                 results.append((f"Path: {d}", False, f"not writable: {e}"))
         return results
 
+    def cmd_logs(self, args: argparse.Namespace) -> int:
+        """查看 Agent 日志（尾部 N 行）。
+
+        :param args: 命令行参数，支持 --lines 指定行数。
+        :type args: argparse.Namespace
+        :return: 成功返回0，日志文件不存在返回1。
+        :rtype: int
+        """
+        config_path = args.config or DEFAULT_CONFIG_PATH
+        log_file = self._resolve_log_file(config_path)
+        if log_file is None or not os.path.exists(log_file):
+            logger.error("Log file not found: %s", log_file or '(none)')
+            return 1
+        lines = self._read_log_tail(log_file, args.lines)
+        for line in lines:
+            print(line, end='' if line.endswith('\n') else '\n')
+        return 0
+
+    def _resolve_log_file(self, config_path: str) -> Optional[str]:
+        """从配置文件解析日志文件路径。"""
+        try:
+            import yaml
+            if not os.path.exists(config_path):
+                return None
+            with open(config_path, 'r', encoding='utf-8') as f:
+                cfg = yaml.safe_load(f) or {}
+            log_dir = cfg.get('paths', {}).get('log_dir', 'logs')
+            log_file = cfg.get('logging', {}).get('file', 'logs/agent.log').split('/')[-1]
+            return os.path.join(log_dir, log_file)
+        except Exception:
+            return None
+
+    def _read_log_tail(self, log_file: str, n: int) -> List[str]:
+        """读取日志文件尾部 n 行。"""
+        try:
+            with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+                all_lines = f.readlines()
+            return all_lines[-n:] if n > 0 else all_lines
+        except OSError as e:
+            logger.error("Failed to read log file %s: %s", log_file, e)
+            return []
+
 
 def _resolve_config_path(args_config: Optional[str]) -> str:
     if args_config:
@@ -471,6 +610,11 @@ Examples:
     # doctor
     subparsers.add_parser('doctor', help='Run health check (deps, config, paths)')
 
+    # logs
+    logs_parser = subparsers.add_parser('logs', help='Show recent log lines')
+    logs_parser.add_argument('--lines', '-n', type=int, default=50,
+                             help='Number of lines to show (default: 50)')
+
     args = parser.parse_args()
 
     if not args.command:
@@ -486,6 +630,7 @@ Examples:
         'config': cli.cmd_config,
         'cycle': cli.cmd_cycle,
         'doctor': cli.cmd_doctor,
+        'logs': cli.cmd_logs,
     }
 
     handler = command_map.get(args.command)

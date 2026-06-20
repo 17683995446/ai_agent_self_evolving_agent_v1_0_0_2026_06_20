@@ -70,6 +70,7 @@ self-evolving-agent <command> [options]
 | `status` | 查看 Agent 状态 | `status --json` |
 | `cycle` | 执行单次循环（调试用） | `cycle --json` |
 | `doctor` | 健康检查（依赖/配置/路径） | `doctor` |
+| `logs` | 查看最近日志 | `logs --lines 20` |
 | `config show` | 查看当前配置 | `config show` |
 | `config validate` | 校验配置合法性 | `config validate` |
 | `config init` | 生成默认配置文件 | `config init --force` |
