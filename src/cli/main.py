@@ -553,6 +553,75 @@ paths:
         print(f"Execution: {result['execution']['status']}")
         print(f"Safety: emergency={result['safety']['emergency_mode']}")
 
+    def cmd_quickstart(self, args: argparse.Namespace) -> int:
+        """一键快速体验：doctor → config init → cycle → status。
+
+        :param args: 命令行参数。
+        :type args: argparse.Namespace
+        :return: 全流程成功返回0，任一步失败返回1。
+        :rtype: int
+        """
+        print("=" * 55)
+        print("  Self-Evolving Agent - Quick Start")
+        print("  30秒体验自驱进化 Agent 系统")
+        print("=" * 55)
+        print()
+
+        # Step 1: 健康检查
+        print("[1/4] Health Check (doctor)")
+        print("-" * 40)
+        doctor_args = argparse.Namespace(config=args.config)
+        doctor_ret = self.cmd_doctor(doctor_args)
+        if doctor_ret != 0:
+            print("\nHealth check failed. Please fix the issues above before continuing.")
+            return 1
+        print()
+
+        # Step 2: 初始化配置（若不存在）
+        print("[2/4] Initialize Config (config init)")
+        print("-" * 40)
+        config_path = args.config or DEFAULT_CONFIG_PATH
+        if os.path.exists(config_path):
+            print(f"Config already exists: {config_path} (skip init)")
+        else:
+            init_args = argparse.Namespace(config=config_path, action='init', force=False)
+            init_ret = self.cmd_config(init_args)
+            if init_ret != 0:
+                print("\nConfig init failed.")
+                return 1
+        print()
+
+        # Step 3: 执行单次循环
+        print("[3/4] Run Single Cycle (cycle)")
+        print("-" * 40)
+        cycle_args = argparse.Namespace(config=config_path, json=False)
+        cycle_ret = self.cmd_cycle(cycle_args)
+        if cycle_ret != 0:
+            print("\nCycle execution failed.")
+            return 1
+        print()
+
+        # Step 4: 查看状态
+        print("[4/4] Show Status (status)")
+        print("-" * 40)
+        status_args = argparse.Namespace(config=config_path, json=False)
+        status_ret = self.cmd_status(status_args)
+        if status_ret != 0:
+            print("\nStatus query failed.")
+            return 1
+        print()
+
+        print("=" * 55)
+        print("  Quick Start Complete!")
+        print("  系统已成功运行一个完整周期。")
+        print()
+        print("  Next steps:")
+        print("    - 持续运行: self-evolving-agent start --cycles 10")
+        print("    - 查看日志: self-evolving-agent logs --lines 20")
+        print("    - 查看文档: README.md")
+        print("=" * 55)
+        return 0
+
     def cmd_doctor(self, args: argparse.Namespace) -> int:
         """健康检查：验证运行环境、依赖、配置、路径权限。
 
@@ -758,6 +827,9 @@ Examples:
     logs_parser.add_argument('--lines', '-n', type=int, default=50,
                              help='Number of lines to show (default: 50)')
 
+    # quickstart
+    subparsers.add_parser('quickstart', help='One-click demo: doctor + init + cycle + status')
+
     args = parser.parse_args()
 
     if not args.command:
@@ -774,6 +846,7 @@ Examples:
         'cycle': cli.cmd_cycle,
         'doctor': cli.cmd_doctor,
         'logs': cli.cmd_logs,
+        'quickstart': cli.cmd_quickstart,
     }
 
     handler = command_map.get(args.command)

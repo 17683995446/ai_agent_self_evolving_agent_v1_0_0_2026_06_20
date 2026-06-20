@@ -37,6 +37,13 @@ pip install -r requirements.txt
 ### 30 秒体验
 
 ```bash
+# 一键快速体验（自动执行：健康检查 → 初始化配置 → 单次循环 → 查看状态）
+self-evolving-agent quickstart
+```
+
+或分步执行：
+
+```bash
 # 1. 初始化默认配置
 self-evolving-agent config init
 
@@ -71,6 +78,7 @@ self-evolving-agent <command> [options]
 | `cycle` | 执行单次循环（调试用） | `cycle --json` |
 | `doctor` | 健康检查（依赖/配置/路径） | `doctor` |
 | `logs` | 查看最近日志 | `logs --lines 20` |
+| `quickstart` | 一键体验（doctor+init+cycle+status） | `quickstart` |
 | `config show` | 查看当前配置 | `config show` |
 | `config validate` | 校验配置合法性 | `config validate` |
 | `config init` | 生成默认配置文件 | `config init --force` |
