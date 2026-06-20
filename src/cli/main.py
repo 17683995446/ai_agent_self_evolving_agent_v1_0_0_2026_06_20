@@ -87,6 +87,9 @@ class ColorOutput:
 # 全局颜色输出实例
 _color = ColorOutput()
 
+# 统一分隔符宽度
+SEPARATOR_WIDTH = 50
+
 
 def _get_version() -> str:
     """获取项目版本号。
@@ -386,9 +389,9 @@ class AgentCLI(BaseAgentCLI):
         return stats
 
     def _print_status(self, stats: Dict[str, Any]) -> None:
-        print("=" * 40)
+        print("=" * SEPARATOR_WIDTH)
         print(_color.bold("Agent Status"))
-        print("=" * 40)
+        print("=" * SEPARATOR_WIDTH)
         running = stats.get('running', False)
         running_text = _color.ok('YES') if running else _color.warn('NO')
         print(f"Running:          {running_text}")
@@ -422,7 +425,7 @@ class AgentCLI(BaseAgentCLI):
             print(f"Success Rate:     {sr}")
         print(f"Config:           {stats.get('config_path', '-')}")
         print(f"Log Dir:          {stats.get('log_dir', '-')}")
-        print("=" * 40)
+        print("=" * SEPARATOR_WIDTH)
 
     def cmd_config(self, args: argparse.Namespace) -> int:
         """配置管理"""
@@ -580,10 +583,10 @@ class AgentCLI(BaseAgentCLI):
         :rtype: int
         """
         config_path = args.config or DEFAULT_CONFIG_PATH
-        print("=" * 55)
+        print("=" * SEPARATOR_WIDTH)
         print("  Self-Evolving Agent - Configuration Wizard")
         print("  交互式配置向导，按 Ctrl+C 取消")
-        print("=" * 55)
+        print("=" * SEPARATOR_WIDTH)
         print()
 
         try:
@@ -846,10 +849,10 @@ paths:
         :return: 全流程成功返回0，任一步失败返回1。
         :rtype: int
         """
-        print("=" * 55)
+        print("=" * SEPARATOR_WIDTH)
         print("  Self-Evolving Agent - Quick Start")
         print("  30秒体验自驱进化 Agent 系统")
-        print("=" * 55)
+        print("=" * SEPARATOR_WIDTH)
         print()
 
         # Step 1: 健康检查
@@ -896,7 +899,7 @@ paths:
             return 1
         print()
 
-        print("=" * 55)
+        print("=" * SEPARATOR_WIDTH)
         print("  Quick Start Complete!")
         print("  系统已成功运行一个完整周期。")
         print()
@@ -904,7 +907,7 @@ paths:
         print("    - 持续运行: self-evolving-agent start --cycles 10")
         print("    - 查看日志: self-evolving-agent logs --lines 20")
         print("    - 查看文档: README.md")
-        print("=" * 55)
+        print("=" * SEPARATOR_WIDTH)
         return 0
 
     def cmd_doctor(self, args: argparse.Namespace) -> int:
@@ -916,7 +919,7 @@ paths:
         :rtype: int
         """
         print(f"Self-Evolving Agent v{_get_version()} - Health Check")
-        print("=" * 50)
+        print("=" * SEPARATOR_WIDTH)
 
         checks: List[Tuple[str, bool, str]] = []
         checks.extend(self._check_python_version())
@@ -933,7 +936,7 @@ paths:
                 status = _color.fail("[FAIL]")
             print(f"  {status} {name}: {msg}")
 
-        print("=" * 50)
+        print("=" * SEPARATOR_WIDTH)
         result_text = f"Result: {passed}/{total} checks passed"
         if passed == total:
             print(_color.ok(result_text))
@@ -1260,11 +1263,11 @@ paths:
             else cfg.get('logging', {}).get('backup_count', 5)
         dry_run = args.dry_run
 
-        print("=" * 50)
+        print("=" * SEPARATOR_WIDTH)
         print("Self-Evolving Agent - Data Cleanup")
         if dry_run:
             print("  (DRY RUN - no files will be deleted)")
-        print("=" * 50)
+        print("=" * SEPARATOR_WIDTH)
         print()
 
         total_freed = 0
@@ -1284,7 +1287,7 @@ paths:
                 print(_color.ok(freed_text))
             else:
                 print(freed_text)
-        print("=" * 50)
+        print("=" * SEPARATOR_WIDTH)
         return 0
 
     def _load_config(self, config_path: str) -> Dict[str, Any]:
@@ -1528,7 +1531,7 @@ Examples:
 
     # logs
     logs_parser = subparsers.add_parser('logs', help='Show recent log lines')
-    logs_parser.add_argument('--lines', '-n', type=int, default=50,
+    logs_parser.add_argument('--lines', '-l', type=int, default=50,
                              help='Number of lines to show (default: 50)')
 
     # quickstart
