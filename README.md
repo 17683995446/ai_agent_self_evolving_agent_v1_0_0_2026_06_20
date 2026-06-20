@@ -110,6 +110,13 @@ self-evolving-agent dashboard --port 8080
 
 仪表盘读取 `metrics.json` 和快照索引，无需 Agent 在线即可查看历史数据。按 `Ctrl+C` 停止。
 
+**安全提示**：默认绑定 `127.0.0.1`，仅本机可访问。若需远程访问，使用 `--host 0.0.0.0` 并配合 `--auth-token` 设置认证令牌：
+
+```bash
+self-evolving-agent dashboard --host 0.0.0.0 --port 8080 --auth-token my_secret
+# API 请求需携带 X-Auth-Token: my_secret 头
+```
+
 ## 配置说明
 
 配置文件为 YAML 格式，主要分段：

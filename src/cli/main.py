@@ -1059,7 +1059,7 @@ paths:
         读取 metrics.json 实时展示 Agent 运行状态，无需 Agent 在线。
         用户通过浏览器访问 http://host:port 查看仪表盘。
 
-        :param args: 命令行参数，支持 --host 和 --port。
+        :param args: 命令行参数，支持 --host/--port/--auth-token。
         :type args: argparse.Namespace
         :return: 成功启动并正常退出返回0，端口占用等错误返回1。
         :rtype: int
@@ -1071,6 +1071,7 @@ paths:
         data_dir = self._resolve_data_dir(config_path)
         host = args.host
         port = args.port
+        auth_token = args.auth_token
 
         try:
             from src.dashboard.server import _DASHBOARD_HTML
@@ -1079,13 +1080,18 @@ paths:
             return 1
 
         handler = self._create_standalone_handler(
-            _DASHBOARD_HTML, config_path, data_dir
+            _DASHBOARD_HTML, config_path, data_dir, auth_token
         )
 
         print("Self-Evolving Agent Dashboard")
         print(f"  URL:          http://{host}:{port}")
         print(f"  Config:       {config_path}")
         print(f"  Data dir:     {data_dir}")
+        if auth_token:
+            print(f"  Auth token:   {auth_token}")
+            print(f"  Access API with: curl -H 'X-Auth-Token: {auth_token}' http://{host}:{port}/api/data")
+        else:
+            print("  Auth:         disabled (bind to 127.0.0.1 for safety)")
         print("  Press Ctrl+C to stop.")
         print()
 
@@ -1113,17 +1119,20 @@ paths:
             return 'data'
 
     def _create_standalone_handler(
-        self, html_template: str, config_path: str, data_dir: str
+        self, html_template: str, config_path: str, data_dir: str,
+        auth_token: Optional[str] = None,
     ) -> type:
         """创建独立的 dashboard HTTP 请求处理器类型。
 
         :param html_template: 仪表盘 HTML 模板字符串。
         :param config_path: 配置文件路径。
         :param data_dir: 数据目录路径。
+        :param auth_token: 可选认证令牌，非空时 API 请求需携带 X-Auth-Token 头。
         :return: BaseHTTPRequestHandler 子类。
         """
         cli_ref = self
         config_ref = config_path
+        token_ref = auth_token
 
         class StandaloneDashboardHandler(BaseHTTPRequestHandler):
             """独立仪表盘处理器：每次请求读取 metrics.json 获取实时数据。"""
@@ -1131,6 +1140,13 @@ paths:
             def do_GET(self):
                 route = self._get_route()
                 route()
+
+            def _check_auth(self) -> bool:
+                """检查请求是否携带有效认证令牌。"""
+                if not token_ref:
+                    return True
+                provided = self.headers.get('X-Auth-Token', '')
+                return provided == token_ref
 
             def _get_route(self):
                 if self.path == '/':
@@ -1148,6 +1164,12 @@ paths:
                 self.wfile.write(html_template.encode('utf-8'))
 
             def _serve_data(self):
+                if not self._check_auth():
+                    self.send_response(401)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'error': 'Unauthorized'}).encode('utf-8'))
+                    return
                 stats = cli_ref._get_lightweight_status(config_ref)
                 history = cli_ref._read_history_from_snapshots()
                 data = {
@@ -1164,7 +1186,6 @@ paths:
                 payload = json.dumps(data, default=str).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(payload)
 
@@ -1516,6 +1537,8 @@ Examples:
                                   help='Dashboard host (default: 127.0.0.1)')
     dashboard_parser.add_argument('--port', '-p', type=int, default=8080,
                                   help='Dashboard port (default: 8080)')
+    dashboard_parser.add_argument('--auth-token', default=None,
+                                  help='Auth token for API access (X-Auth-Token header)')
 
     # cleanup
     cleanup_parser = subparsers.add_parser(
