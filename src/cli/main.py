@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""CLI命令行入口：提供启动、停止、状态查询、配置管理等功能"""
+"""CLI命令行入口：提供启动、停止、状态查询、配置管理、健康检查等功能"""
 
 import abc
 import argparse
-import logging
-import sys
-import os
+import importlib.metadata
 import json
+import logging
+import os
 import signal
-from typing import Optional, Dict, Any
+import sys
+from typing import Any, Dict, List, Optional, Tuple
 
 # 确保src在路径中
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -17,6 +18,17 @@ from src.core.agent_loop import AgentLoop
 from src.core.constants import DEFAULT_CONFIG_PATH
 
 logger = logging.getLogger(__name__)
+
+
+def _get_version() -> str:
+    """获取项目版本号。
+
+    优先从已安装的包元数据读取，回退到硬编码版本。
+    """
+    try:
+        return importlib.metadata.version('self-evolving-agent')
+    except importlib.metadata.PackageNotFoundError:
+        return '1.0.0'
 
 
 class BaseAgentCLI(abc.ABC):
@@ -301,6 +313,106 @@ paths:
         print(f"Execution: {result['execution']['status']}")
         print(f"Safety: emergency={result['safety']['emergency_mode']}")
 
+    def cmd_doctor(self, args: argparse.Namespace) -> int:
+        """健康检查：验证运行环境、依赖、配置、路径权限。
+
+        :param args: 命令行参数。
+        :type args: argparse.Namespace
+        :return: 全部通过返回0，存在问题返回1。
+        :rtype: int
+        """
+        print(f"Self-Evolving Agent v{_get_version()} - Health Check")
+        print("=" * 50)
+
+        checks: List[Tuple[str, bool, str]] = []
+        checks.extend(self._check_python_version())
+        checks.extend(self._check_dependencies())
+        checks.extend(self._check_config(args))
+        checks.extend(self._check_paths(args))
+
+        passed = sum(1 for _, ok, _ in checks if ok)
+        total = len(checks)
+        for name, ok, msg in checks:
+            status = "[OK]  " if ok else "[FAIL]"
+            print(f"  {status} {name}: {msg}")
+
+        print("=" * 50)
+        print(f"Result: {passed}/{total} checks passed")
+        if passed == total:
+            print("All checks passed. System is ready.")
+            return 0
+        print("Some checks failed. Please review the issues above.")
+        return 1
+
+    def _check_python_version(self) -> List[Tuple[str, bool, str]]:
+        """检查 Python 版本。"""
+        major, minor = sys.version_info[:2]
+        ok = (major, minor) >= (3, 10)
+        return [('Python Version', ok, f"{major}.{minor}")]
+
+    def _check_dependencies(self) -> List[Tuple[str, bool, str]]:
+        """检查关键依赖包是否可导入。"""
+        deps = [
+            ('psutil', 'psutil'),
+            ('numpy', 'numpy'),
+            ('statsmodels', 'statsmodels'),
+            ('yaml (PyYAML)', 'yaml'),
+            ('watchdog', 'watchdog'),
+        ]
+        results: List[Tuple[str, bool, str]] = []
+        for label, module_name in deps:
+            try:
+                mod = __import__(module_name)
+                version = getattr(mod, '__version__', 'unknown')
+                results.append((label, True, version))
+            except ImportError as e:
+                results.append((label, False, f"not installed: {e}"))
+        return results
+
+    def _check_config(self, args: argparse.Namespace) -> List[Tuple[str, bool, str]]:
+        """检查配置文件是否存在且可加载。"""
+        config_path = args.config or DEFAULT_CONFIG_PATH
+        if not os.path.exists(config_path):
+            return [('Config File', False, f"not found: {config_path}")]
+        try:
+            import yaml
+            with open(config_path, 'r', encoding='utf-8') as f:
+                yaml.safe_load(f)
+            return [('Config File', True, config_path)]
+        except Exception as e:
+            return [('Config File', False, f"parse error: {e}")]
+
+    def _check_paths(self, args: argparse.Namespace) -> List[Tuple[str, bool, str]]:
+        """检查数据路径是否可创建/可写。"""
+        config_path = args.config or DEFAULT_CONFIG_PATH
+        required_dirs = ['data', 'logs', 'snapshots']
+        try:
+            import yaml
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    cfg = yaml.safe_load(f) or {}
+                paths = cfg.get('paths', {})
+                required_dirs = [
+                    paths.get('data_dir', 'data'),
+                    paths.get('log_dir', 'logs'),
+                    paths.get('snapshot_dir', 'snapshots'),
+                ]
+        except Exception:
+            pass
+
+        results: List[Tuple[str, bool, str]] = []
+        for d in required_dirs:
+            try:
+                os.makedirs(d, exist_ok=True)
+                test_file = os.path.join(d, '.doctor_write_test')
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+                results.append((f"Path: {d}", True, "writable"))
+            except OSError as e:
+                results.append((f"Path: {d}", False, f"not writable: {e}"))
+        return results
+
 
 def _resolve_config_path(args_config: Optional[str]) -> str:
     if args_config:
@@ -321,12 +433,15 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m src.cli.main start --cycles 10
-  python -m src.cli.main status
-  python -m src.cli.main config init
-  python -m src.cli.main cycle --json
+  self-evolving-agent doctor                  # 健康检查
+  self-evolving-agent config init             # 初始化配置
+  self-evolving-agent start --cycles 10       # 启动运行10个周期
+  self-evolving-agent status --json           # JSON格式查看状态
+  self-evolving-agent cycle                   # 执行单次循环
         """
     )
+    parser.add_argument('--version', '-V', action='version',
+                        version=f'self-evolving-agent {_get_version()}')
     parser.add_argument('--config', '-c', help='Path to config file')
     parser.add_argument('--json', action='store_true', help='Output in JSON format')
 
@@ -353,6 +468,9 @@ Examples:
     # cycle
     subparsers.add_parser('cycle', help='Run a single cycle')
 
+    # doctor
+    subparsers.add_parser('doctor', help='Run health check (deps, config, paths)')
+
     args = parser.parse_args()
 
     if not args.command:
@@ -367,6 +485,7 @@ Examples:
         'status': cli.cmd_status,
         'config': cli.cmd_config,
         'cycle': cli.cmd_cycle,
+        'doctor': cli.cmd_doctor,
     }
 
     handler = command_map.get(args.command)

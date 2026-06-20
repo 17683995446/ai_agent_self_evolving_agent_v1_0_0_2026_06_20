@@ -69,12 +69,14 @@ self-evolving-agent <command> [options]
 | `stop` | 停止运行中的 Agent | `stop` |
 | `status` | 查看 Agent 状态 | `status --json` |
 | `cycle` | 执行单次循环（调试用） | `cycle --json` |
+| `doctor` | 健康检查（依赖/配置/路径） | `doctor` |
 | `config show` | 查看当前配置 | `config show` |
 | `config validate` | 校验配置合法性 | `config validate` |
 | `config init` | 生成默认配置文件 | `config init --force` |
 
 **全局选项**：
 
+- `--version, -V`：查看版本号
 - `--config, -c`：指定配置文件路径（默认按 `AGENT_ENV` 环境变量选择 dev/test/prod）
 - `--json`：以 JSON 格式输出（适用于 `status`、`cycle`）
 
