@@ -184,6 +184,17 @@ python examples/multi_agent_long_task_demo.py
 
 `LongTaskPlanner` 将长任务分解为可检查点的子任务，`MultiAgentLongTaskRunner` 驱动执行，`LongTaskReviewer` 复盘改进，支持中断恢复。
 
+## 入门示例
+
+`examples/` 目录提供渐进式入门示例：
+
+| 示例 | 说明 | 运行命令 |
+|------|------|----------|
+| `01_single_cycle.py` | 最简单的单周期运行 | `python examples/01_single_cycle.py` |
+| `02_multi_cycle.py` | 多周期连续运行与状态监控 | `python examples/02_multi_cycle.py` |
+| `03_custom_config.py` | 自定义配置运行 | `python examples/03_custom_config.py` |
+| `multi_agent_long_task_demo.py` | 多Agent长任务端到端演示 | `python examples/multi_agent_long_task_demo.py` |
+
 ## 文档
 
 - [项目白皮书](docs/PROJECT_WHITEPAPER.md)：系统架构与设计原理
