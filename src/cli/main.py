@@ -249,7 +249,8 @@ class AgentCLI(BaseAgentCLI):
             with open(config_path, 'r', encoding='utf-8') as f:
                 cfg = yaml.safe_load(f) or {}
             data_dir = cfg.get('paths', {}).get('data_dir', 'data')
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to read config for data_dir, using default 'data': %s", e)
             data_dir = 'data'
         pid_path = os.path.join(data_dir, 'agent.pid')
         if not os.path.exists(pid_path):
@@ -995,8 +996,8 @@ paths:
                     paths.get('log_dir', 'logs'),
                     paths.get('snapshot_dir', 'snapshots'),
                 ]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to read paths from config, using defaults: %s", e)
 
         results: List[Tuple[str, bool, str]] = []
         for d in required_dirs:
@@ -1040,7 +1041,8 @@ paths:
             log_dir = cfg.get('paths', {}).get('log_dir', 'logs')
             log_file = cfg.get('logging', {}).get('file', 'logs/agent.log').split('/')[-1]
             return os.path.join(log_dir, log_file)
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to resolve log file path: %s", e)
             return None
 
     def _read_log_tail(self, log_file: str, n: int) -> List[str]:
@@ -1115,7 +1117,8 @@ paths:
             with open(config_path, 'r', encoding='utf-8') as f:
                 cfg = yaml.safe_load(f) or {}
             return cfg.get('paths', {}).get('data_dir', 'data')
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to resolve data_dir, using default 'data': %s", e)
             return 'data'
 
     def _create_standalone_handler(
@@ -1285,12 +1288,13 @@ paths:
         return 0
 
     def _load_config(self, config_path: str) -> Dict[str, Any]:
-        """加载配置文件，失败时返回空字典。"""
+        """加载配置文件，失败时返回空字典并记录警告。"""
         try:
             import yaml
             with open(config_path, 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f) or {}
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to load config %s: %s", config_path, e)
             return {}
 
     def _cleanup_snapshots(self, snapshot_dir: str, keep: int,
