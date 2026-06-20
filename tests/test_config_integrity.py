@@ -22,20 +22,18 @@ class TestConfigSingletonIntegrity(unittest.TestCase):
     """Config单例完整性测试"""
 
     def tearDown(self):
-        Config._instance = None
-        Config._config = {}
-        Config._lock = threading.Lock()
+        Config._instances = {}
 
     def test_singleton_identity(self):
         """多次创建应返回同一实例"""
-        Config._instance = None
+        Config._instances = {}
         c1 = Config()
         c2 = Config()
         self.assertIs(c1, c2)
 
     def test_concurrent_creation(self):
         """多线程并发创建不应产生多个实例"""
-        Config._instance = None
+        Config._instances = {}
         instances = []
         lock = threading.Lock()
 
@@ -54,9 +52,9 @@ class TestConfigSingletonIntegrity(unittest.TestCase):
 
     def test_concurrent_get_set(self):
         """多线程并发get/set不应崩溃"""
-        Config._instance = None
-        Config._config = {'base': {'counter': 0}}
+        Config._instances = {}
         c = Config()
+        c._config = {'base': {'counter': 0}}
         errors = []
 
         def worker():
@@ -78,17 +76,17 @@ class TestConfigSingletonIntegrity(unittest.TestCase):
 
     def test_set_overwrite_non_dict(self):
         """set()应能覆盖非dict的中间值"""
-        Config._instance = None
-        Config._config = {'a': 'string'}
+        Config._instances = {}
         c = Config()
+        c._config = {'a': 'string'}
         c.set('a.b.c', 42)
         self.assertEqual(c.get('a.b.c'), 42)
 
     def test_nested_get_set_consistency(self):
         """嵌套get/set应一致"""
-        Config._instance = None
-        Config._config = {}
+        Config._instances = {}
         c = Config()
+        c._config = {}
         c.set('a.b.c', 42)
         self.assertEqual(c.get('a.b.c'), 42)
         self.assertEqual(c.get('a.b'), {'c': 42})
@@ -96,34 +94,34 @@ class TestConfigSingletonIntegrity(unittest.TestCase):
 
     def test_missing_key_default(self):
         """缺失键应返回默认值"""
-        Config._instance = None
-        Config._config = {'a': {'b': 1}}
+        Config._instances = {}
         c = Config()
+        c._config = {'a': {'b': 1}}
         self.assertIsNone(c.get('a.c'))
         self.assertEqual(c.get('a.c', 'default'), 'default')
         self.assertEqual(c.get('nonexistent.path', 123), 123)
 
     def test_none_value_vs_missing(self):
         """显式None值不应触发默认值"""
-        Config._instance = None
-        Config._config = {'a': {'b': None}}
+        Config._instances = {}
         c = Config()
+        c._config = {'a': {'b': None}}
         self.assertIsNone(c.get('a.b', 'default'))
 
     def test_to_dict_isolation(self):
         """to_dict返回的副本应独立"""
-        Config._instance = None
-        Config._config = {'a': 1}
+        Config._instances = {}
         c = Config()
+        c._config = {'a': 1}
         d = c.to_dict()
         d['a'] = 999
         self.assertEqual(c.get('a'), 1)
 
     def test_load_replaces_config(self):
         """load应替换整个配置"""
-        Config._instance = None
-        Config._config = {'old': 'value'}
+        Config._instances = {}
         c = Config()
+        c._config = {'old': 'value'}
 
         temp_path = os.path.join(tempfile.mkdtemp(), 'config.yaml')
         with open(temp_path, 'w') as f:
@@ -139,49 +137,47 @@ class TestConfigDefaults(unittest.TestCase):
     """配置默认值测试"""
 
     def tearDown(self):
-        Config._instance = None
-        Config._config = {}
-        Config._lock = threading.Lock()
+        Config._instances = {}
 
     def test_get_base_weights_default(self):
-        Config._instance = None
-        Config._config = {}
+        Config._instances = {}
         c = Config()
+        c._config = {}
         self.assertEqual(c.get_base_weights(), (0.4, 0.4, 0.2))
 
     def test_get_resource_limits_default(self):
-        Config._instance = None
-        Config._config = {}
+        Config._instances = {}
         c = Config()
+        c._config = {}
         limits = c.get_resource_limits()
         self.assertEqual(limits['max_cpu_percent'], 20.0)
         self.assertEqual(limits['max_mem_percent'], 20.0)
 
     def test_get_exploration_config_default(self):
-        Config._instance = None
-        Config._config = {}
+        Config._instances = {}
         c = Config()
+        c._config = {}
         cfg = c.get_exploration_config()
         self.assertEqual(cfg['base_ratio'], 0.3)
 
     def test_get_safety_config_default(self):
-        Config._instance = None
-        Config._config = {}
+        Config._instances = {}
         c = Config()
+        c._config = {}
         cfg = c.get_safety_config()
         self.assertEqual(cfg['max_consecutive_failures'], 5)
 
     def test_get_memory_config_default(self):
-        Config._instance = None
-        Config._config = {}
+        Config._instances = {}
         c = Config()
+        c._config = {}
         cfg = c.get_memory_config()
         self.assertEqual(cfg['max_short_term_samples'], 10000)
 
     def test_get_paths_default(self):
-        Config._instance = None
-        Config._config = {}
+        Config._instances = {}
         c = Config()
+        c._config = {}
         paths = c.get_paths()
         self.assertEqual(paths['data_dir'], 'data')
 
@@ -334,14 +330,10 @@ class TestConfigFileLoading(unittest.TestCase):
     """配置文件加载测试"""
 
     def setUp(self):
-        Config._instance = None
-        Config._config = {}
-        Config._lock = threading.RLock()
+        Config._instances = {}
 
     def tearDown(self):
-        Config._instance = None
-        Config._config = {}
-        Config._lock = threading.RLock()
+        Config._instances = {}
 
     def test_load_valid_yaml(self):
         temp_dir = tempfile.mkdtemp()

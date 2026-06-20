@@ -8,14 +8,43 @@ from typing import Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 
-class BaseConfig(abc.ABC):
+class _ConfigMeta(abc.ABCMeta):
+    """配置类元类：拦截 ``Config._instance`` 与 ``Config._config`` 类属性赋值，
+    向后兼容旧测试代码的重置操作。
+
+    - ``Config._instance = None`` 等价于清空当前类的单例缓存
+    - ``Config._config = {...`` 等价于设置当前单例实例的配置字典
+    """
+
+    def __setattr__(cls, name, value):
+        if name == '_instance' and value is None:
+            cls._instances.pop(cls, None)
+            return
+        if name == '_config':
+            instance = cls._instances.get(cls)
+            if instance is not None:
+                instance._config = value
+            return
+        super().__setattr__(name, value)
+
+    def __getattr__(cls, name):
+        """对未定义的类属性 ``_instance`` 提供向后兼容读取。"""
+        if name == '_instance':
+            return cls._instances.get(cls)
+        if name == '_config':
+            instance = cls._instances.get(cls)
+            return instance._config if instance is not None else {}
+        raise AttributeError(f"type object {cls.__name__!r} has no attribute {name!r}")
+
+
+class BaseConfig(metaclass=_ConfigMeta):
     """配置管理抽象基类。
 
     提供配置加载、获取、设置和导出的抽象接口，支持单例模式。
+    每个子类拥有独立的单例实例与配置字典，避免跨子类共享污染。
     """
 
-    _instance = None
-    _config: Dict[str, Any] = {}
+    _instances: Dict[type, 'BaseConfig'] = {}
     _lock = threading.RLock()
     _singleton = True
 
@@ -27,9 +56,16 @@ class BaseConfig(abc.ABC):
         :return: 单例实例。
         :rtype: BaseConfig
         """
-        if not cls._singleton or cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+        if not cls._singleton:
+            instance = super().__new__(cls)
+            instance._config = {}
+            return instance
+        with cls._lock:
+            if cls not in cls._instances:
+                instance = super().__new__(cls)
+                instance._config = {}
+                cls._instances[cls] = instance
+            return cls._instances[cls]
 
     def __init__(self, config_path: Optional[str] = None):
         """初始化配置管理器。
@@ -37,6 +73,8 @@ class BaseConfig(abc.ABC):
         :param config_path: 配置文件路径，提供则自动加载。
         :type config_path: Optional[str]
         """
+        if not hasattr(self, '_config'):
+            self._config = {}
         if config_path:
             self.load(config_path)
 

@@ -10,8 +10,7 @@ from src.core.config import Config
 
 class TestConfig(unittest.TestCase):
     def setUp(self):
-        Config._instance = None
-        Config._config = {}
+        Config._instances = {}
 
     def test_load_valid_config(self):
         config_content = """
@@ -33,34 +32,34 @@ base_weights:
             os.unlink(path)
 
     def test_get_nested_key(self):
-        Config._config = {'a': {'b': {'c': 42}}}
         cfg = Config()
+        cfg._config = {'a': {'b': {'c': 42}}}
         self.assertEqual(cfg.get('a.b.c'), 42)
         self.assertIsNone(cfg.get('a.b.x'))
         self.assertEqual(cfg.get('a.b.x', 'default'), 'default')
 
     def test_set_nested_key(self):
-        Config._config = {}
         cfg = Config()
+        cfg._config = {}
         cfg.set('a.b.c', 100)
         self.assertEqual(cfg.get('a.b.c'), 100)
 
     def test_get_base_weights(self):
-        Config._config = {'base_weights': {'safe': 0.6, 'gain': 0.2, 'eff': 0.2}}
         cfg = Config()
+        cfg._config = {'base_weights': {'safe': 0.6, 'gain': 0.2, 'eff': 0.2}}
         weights = cfg.get_base_weights()
         self.assertEqual(weights, (0.6, 0.2, 0.2))
 
     def test_get_base_weights_default(self):
-        Config._config = {}
         cfg = Config()
+        cfg._config = {}
         weights = cfg.get_base_weights()
         self.assertEqual(weights, (0.4, 0.4, 0.2))
 
     def test_ensure_paths(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            Config._config = {'paths': {'data_dir': os.path.join(tmpdir, 'data')}}
             cfg = Config()
+            cfg._config = {'paths': {'data_dir': os.path.join(tmpdir, 'data')}}
             cfg.ensure_paths()
             self.assertTrue(os.path.exists(os.path.join(tmpdir, 'data')))
 

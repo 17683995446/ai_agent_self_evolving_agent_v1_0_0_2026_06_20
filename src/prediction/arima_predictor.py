@@ -1,34 +1,11 @@
-import abc
 from typing import List, Optional, Dict, Any
 from collections import deque
 import logging
 import threading
 
+from .base_predictor import BasePredictor
+
 logger = logging.getLogger(__name__)
-
-
-class BasePredictor(abc.ABC):
-    """Abstract base class for all predictors."""
-
-    @abc.abstractmethod
-    def predict(self, steps: int = 1) -> List[float]:
-        """Predict future values.
-
-        :param steps: Number of steps to predict.
-        :type steps: int
-        :return: Predicted future values.
-        :rtype: List[float]
-        """
-
-    @abc.abstractmethod
-    def update(self, actual: float) -> None:
-        """Update predictor with actual value.
-
-        :param actual: Actual observed value.
-        :type actual: float
-        :return: None
-        :rtype: None
-        """
 
 
 class ARIMAModel(BasePredictor):
