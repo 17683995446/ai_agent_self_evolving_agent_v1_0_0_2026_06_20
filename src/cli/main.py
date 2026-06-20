@@ -303,41 +303,63 @@ class AgentCLI(BaseAgentCLI):
         with open(config_path, 'w') as f:
             f.write(self._default_config())
         logger.info("Default config written to: %s", config_path)
+        print(f"Config created: {config_path}")
+        print()
+        print("Next steps:")
+        print(f"  1. Edit {config_path} to adjust settings")
+        print("  2. Run 'self-evolving-agent config validate' to check")
+        print("  3. Run 'self-evolving-agent doctor' to verify environment")
+        print("  4. Run 'self-evolving-agent start' to launch")
         return 0
 
     def _default_config(self) -> str:
-        return """goals:
-  precision_evolution: true
-  coverage_evolution: true
-  efficiency_evolution: true
+        """生成带注释的默认配置模板，便于用户理解各字段含义。"""
+        return """# Self-Evolving Agent 配置文件
+# 生成命令: self-evolving-agent config init
+# 完整文档: https://github.com/17683995446/self_evolving_agent
 
+# === 进化目标开关 ===
+# 控制系统自主进化的方向
+goals:
+  precision_evolution: true    # 预测精度进化（降低 MAE）
+  coverage_evolution: true     # 行为覆盖进化（探索新任务）
+  efficiency_evolution: true   # 能效进化（降低资源消耗）
+
+# === 驱力权重 ===
+# 三大驱力的权重，和为 1.0，决定任务优先级
 base_weights:
-  safe: 0.4
-  gain: 0.4
-  eff: 0.2
+  safe: 0.4    # 安全驱力：避免危险行为
+  gain: 0.4    # 收益驱力：追求预测精度提升
+  eff: 0.2     # 能效驱力：降低资源消耗
 
+# === 资源限制 ===
+# Agent 运行时的资源上限，超出触发紧急模式
 resource_limits:
-  max_cpu_percent: 20.0
-  max_mem_percent: 20.0
-  max_db_size_mb: 500
-  max_snapshot_count: 10
+  max_cpu_percent: 20.0        # CPU 使用率上限（%）
+  max_mem_percent: 20.0        # 内存使用率上限（%）
+  max_db_size_mb: 500          # 记忆数据库大小上限（MB）
+  max_snapshot_count: 10       # 模型快照保留数量
 
+# === 探索策略 ===
+# 控制任务生成的探索行为比例
 exploration:
-  base_ratio: 0.3
-  stable_threshold: 0.05
-  emergency_ratio: 0.1
-  novel_ratio: 0.4
+  base_ratio: 0.3              # 基础探索比例
+  stable_threshold: 0.05       # 稳定性判定阈值
+  emergency_ratio: 0.1         # 紧急模式探索比例
+  novel_ratio: 0.4             # 新颖任务比例
 
+# === 预测模型参数 ===
 models:
-  smoothing_alpha: 0.3
-  smoothing_alpha_min: 0.05
-  smoothing_alpha_max: 0.8
-  arima_order: [1, 1, 1]
-  prediction_horizon: 1
+  smoothing_alpha: 0.3         # 指数平滑系数（0~1，越大越敏感）
+  smoothing_alpha_min: 0.05    # 平滑系数下限
+  smoothing_alpha_max: 0.8     # 平滑系数上限
+  arima_order: [1, 1, 1]       # ARIMA 阶数 [p, d, q]
+  prediction_horizon: 1        # 预测步长
 
+# === 安全约束 ===
 safety:
-  max_consecutive_failures: 5
-  forbidden_paths:
+  max_consecutive_failures: 5          # 连续失败上限，超出冻结任务
+  forbidden_paths:                     # 禁止访问的路径
     - /boot
     - /etc
     - /proc
@@ -349,30 +371,35 @@ safety:
     - /lib64
     - /usr/bin
     - /usr/sbin
-  max_model_restructure_iterations: 3
+  max_model_restructure_iterations: 3  # 模型重构最大迭代次数
 
+# === 离线复盘 ===
+# 定期复盘历史数据，优化模型
 review:
-  interval_hours: 6
-  min_samples: 100
-  idle_cpu_threshold: 10.0
-  idle_duration_seconds: 300
+  interval_hours: 6            # 复盘间隔（小时）
+  min_samples: 100             # 触发复盘的最小样本数
+  idle_cpu_threshold: 10.0     # CPU 空闲阈值（%）
+  idle_duration_seconds: 300   # 空闲持续时长（秒）
 
+# === 记忆管理 ===
 memory:
-  max_short_term_samples: 10000
-  value_retention_ratio: 0.3
-  history_window: 100
+  max_short_term_samples: 10000    # 短期记忆最大样本数
+  value_retention_ratio: 0.3       # 高价值样本保留比例
+  history_window: 100              # 历史窗口大小
 
+# === 日志配置 ===
 logging:
-  level: INFO
+  level: INFO                                      # 日志级别：DEBUG/INFO/WARNING/ERROR
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  file: logs/agent.log
-  max_bytes: 10485760
-  backup_count: 5
+  file: logs/agent.log                             # 日志文件路径
+  max_bytes: 10485760                              # 单文件最大字节数（10MB）
+  backup_count: 5                                  # 保留备份文件数
 
+# === 数据路径 ===
 paths:
-  data_dir: data
-  snapshot_dir: snapshots
-  log_dir: logs
+  data_dir: data        # 数据目录（记忆数据库等）
+  snapshot_dir: snapshots  # 快照目录（模型快照）
+  log_dir: logs         # 日志目录
 """
 
     def cmd_cycle(self, args: argparse.Namespace) -> int:
