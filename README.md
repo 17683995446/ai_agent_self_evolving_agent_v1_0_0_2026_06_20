@@ -24,36 +24,43 @@
 ```bash
 git clone <repo-url> self_evolving_agent
 cd self_evolving_agent
+
+# 方式一：可编辑安装（推荐，注册 self-evolving-agent 命令）
+pip install -e .
+
+# 方式二：仅安装依赖
 pip install -r requirements.txt
 ```
+
+安装后可直接使用 `self-evolving-agent` 命令，或通过 `python -m src.cli.main` 调用。
 
 ### 30 秒体验
 
 ```bash
 # 1. 初始化默认配置
-python -m src.cli.main config init
+self-evolving-agent config init
 
 # 2. 执行单次循环（观察输出）
-python -m src.cli.main cycle
+self-evolving-agent cycle
 
 # 3. 启动持续运行（Ctrl+C 停止）
-python -m src.cli.main start --cycles 10
+self-evolving-agent start --cycles 10
 ```
 
 ### 查看状态
 
 ```bash
 # 文本格式
-python -m src.cli.main status
+self-evolving-agent status
 
 # JSON 格式（便于脚本处理）
-python -m src.cli.main status --json
+self-evolving-agent status --json
 ```
 
 ## CLI 命令一览
 
 ```bash
-python -m src.cli.main <command> [options]
+self-evolving-agent <command> [options]
 ```
 
 | 命令 | 说明 | 示例 |
