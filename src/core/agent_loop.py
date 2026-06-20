@@ -376,7 +376,7 @@ class AgentLoop(BaseAgentLoop):
         """启动周期并返回周期编号和开始时间。"""
         cycle = self._next_cycle()
         start = time.time()
-        logger.info(f"[Cycle {cycle}] START")
+        logger.info("[Cycle %s] START", cycle)
         return cycle, start
 
     def _run_cycle_body(self, cycle: int) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
@@ -393,7 +393,7 @@ class AgentLoop(BaseAgentLoop):
                       cycle_start: float) -> Dict[str, Any]:
         """完成周期并返回结果。"""
         duration = time.time() - cycle_start
-        logger.info(f"[Cycle {cycle}] END, duration={duration:.4f}s")
+        logger.info("[Cycle %s] END, duration=%.4fs", cycle, duration)
         result = self._build_result(result_data, duration)
         self._update_dashboard(result)
         return result
@@ -417,49 +417,49 @@ class AgentLoop(BaseAgentLoop):
 
     def _step_perceive(self, cycle: int) -> Tuple[Dict[str, Any], Dict[str, float]]:
         """感知环境。"""
-        logger.info(f"[Cycle {cycle}] STEP 1: perceive")
+        logger.info("[Cycle %s] STEP 1: perceive", cycle)
         state = self.state_vector.perceive()
         flat_state = self.state_vector.flatten(state)
-        logger.info(f"[Cycle {cycle}] STEP 1: perceive DONE")
+        logger.info("[Cycle %s] STEP 1: perceive DONE", cycle)
         return state, flat_state
 
     def _step_safety(self, cycle: int, state: Dict[str, Any]) -> Dict[str, Any]:
         """安全护栏检查。"""
-        logger.info(f"[Cycle {cycle}] STEP 2: safety_check")
+        logger.info("[Cycle %s] STEP 2: safety_check", cycle)
         safety = self._run_safety_check(cycle)
         if not safety.get('emergency_mode', False):
             self.safety_enforcer.clear_emergency()
-        logger.info(f"[Cycle {cycle}] STEP 2: safety_check DONE")
+        logger.info("[Cycle %s] STEP 2: safety_check DONE", cycle)
         return safety
 
     def _run_safety_check(self, cycle: int) -> Dict[str, Any]:
         try:
             return self.safety_enforcer.full_check()
         except Exception as e:
-            logger.error(f"[Cycle {cycle}] Safety check failed: {e}")
+            logger.error("[Cycle %s] Safety check failed: %s", cycle, e)
             return {'emergency_mode': True, 'reason': f'safety_error: {e}'}
 
     def _step_predict(self, cycle: int) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, Any]]:
         """多层预测。"""
-        logger.info(f"[Cycle {cycle}] STEP 3: predict")
+        logger.info("[Cycle %s] STEP 3: predict", cycle)
         low_preds = self._predict_low(cycle)
         mid_preds = self._predict_mid(cycle)
         high_preds = self._predict_high(cycle, low_preds, mid_preds)
-        logger.info(f"[Cycle {cycle}] STEP 3: predict DONE")
+        logger.info("[Cycle %s] STEP 3: predict DONE", cycle)
         return low_preds, mid_preds, high_preds
 
     def _predict_low(self, cycle: int) -> Dict[str, float]:
         try:
             return self.low_predictor.predict()
         except Exception as e:
-            logger.error(f"[Cycle {cycle}] Low predictor failed: {e}")
+            logger.error("[Cycle %s] Low predictor failed: %s", cycle, e)
             return {'cpu_percent': 0.0, 'mem_percent': 0.0, 'disk_percent': 0.0}
 
     def _predict_mid(self, cycle: int) -> Dict[str, float]:
         try:
             return self.mid_predictor.predict()
         except Exception as e:
-            logger.error(f"[Cycle {cycle}] Mid predictor failed: {e}")
+            logger.error("[Cycle %s] Mid predictor failed: %s", cycle, e)
             return {'cpu_percent': 0.0, 'mem_percent': 0.0, 'disk_percent': 0.0}
 
     def _predict_high(self, cycle: int, low_preds: Dict[str, float],
@@ -467,12 +467,12 @@ class AgentLoop(BaseAgentLoop):
         try:
             return self.high_predictor.predict(low_preds, mid_preds)
         except Exception as e:
-            logger.error(f"[Cycle {cycle}] High predictor failed: {e}")
+            logger.error("[Cycle %s] High predictor failed: %s", cycle, e)
             return {'recommended_action': 'continue_exploration'}
 
     def _step_evaluate(self, cycle: int, flat_state: Dict[str, Any], low_preds: Dict[str, Any]) -> Tuple[Dict[str, float], Dict[str, float]]:
         """预测误差评估与修正。"""
-        logger.info(f"[Cycle {cycle}] STEP 4: evaluate")
+        logger.info("[Cycle %s] STEP 4: evaluate", cycle)
         actuals = self._build_actuals(flat_state)
         errors = self._evaluate_and_update(cycle, low_preds, actuals)
         return errors, actuals
@@ -482,7 +482,7 @@ class AgentLoop(BaseAgentLoop):
         self._process_errors(error_result)
         self.low_predictor.update(actuals)
         self.mid_predictor.update(actuals)
-        logger.info(f"[Cycle {cycle}] STEP 4: evaluate DONE, mae={error_result['mae']:.4f}")
+        logger.info("[Cycle %s] STEP 4: evaluate DONE, mae=%.4f", cycle, error_result['mae'])
         return error_result['errors']
 
     def _build_actuals(self, flat_state: Dict[str, Any]) -> Dict[str, float]:
@@ -495,10 +495,10 @@ class AgentLoop(BaseAgentLoop):
 
     def _step_reward(self, cycle: int, state: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, float]]:
         """驱力计算。"""
-        logger.info(f"[Cycle {cycle}] STEP 5: reward")
+        logger.info("[Cycle %s] STEP 5: reward", cycle)
         reward_result = self._compute_reward(cycle, state)
         gap_vector = self._build_gap_vector(reward_result)
-        logger.info(f"[Cycle {cycle}] STEP 5: reward DONE, total={reward_result.get('total_reward', 0.0):.4f}")
+        logger.info("[Cycle %s] STEP 5: reward DONE, total=%.4f", cycle, reward_result.get('total_reward', 0.0))
         return reward_result, gap_vector
 
     def _compute_reward(self, cycle: int, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -506,7 +506,7 @@ class AgentLoop(BaseAgentLoop):
             recent_errors_list = list(self._recent_errors)
             return self.reward_engine.compute_total_reward(state, recent_errors_list)
         except Exception as e:
-            logger.error(f"[Cycle {cycle}] Reward engine failed: {e}")
+            logger.error("[Cycle %s] Reward engine failed: %s", cycle, e)
             return self._default_reward_result()
 
     def _default_reward_result(self) -> Dict[str, Any]:
@@ -521,11 +521,11 @@ class AgentLoop(BaseAgentLoop):
 
     def _step_select_task(self, cycle: int, state: Dict[str, Any], gap_vector: Dict[str, Any]) -> Any:
         """任务池更新与选择。"""
-        logger.debug(f"[Cycle {cycle}] STEP 6: task_select")
+        logger.debug("[Cycle %s] STEP 6: task_select", cycle)
         self._update_task_pool(gap_vector)
         self._score_tasks(state, gap_vector)
         selected_task = self.task_pool.select_task()
-        logger.debug(f"[Cycle {cycle}] STEP 6: task_select DONE, task={selected_task.id if selected_task else None}")
+        logger.debug("[Cycle %s] STEP 6: task_select DONE, task=%s", cycle, selected_task.id if selected_task else None)
         return selected_task
 
     def _update_task_pool(self, gap_vector: Dict[str, Any]) -> None:
@@ -540,24 +540,24 @@ class AgentLoop(BaseAgentLoop):
 
     def _step_execute(self, cycle: int, selected_task: Any, state: Dict[str, Any], high_preds: Dict[str, Any]) -> Dict[str, Any]:
         """任务执行。"""
-        logger.debug(f"[Cycle {cycle}] STEP 7: execute")
+        logger.debug("[Cycle %s] STEP 7: execute", cycle)
         execution_result = self._safe_execute_task(cycle, selected_task, state, high_preds)
-        logger.debug(f"[Cycle {cycle}] STEP 7: execute DONE")
+        logger.debug("[Cycle %s] STEP 7: execute DONE", cycle)
         return execution_result
 
     def _safe_execute_task(self, cycle: int, selected_task: Any, state: Dict[str, Any], high_preds: Dict[str, Any]) -> Dict[str, Any]:
         try:
             return self._execute_task(selected_task, state, high_preds)
         except Exception as e:
-            logger.error(f"[Cycle {cycle}] Task execution failed: {e}")
+            logger.error("[Cycle %s] Task execution failed: %s", cycle, e)
             return {'status': 'error', 'task_id': getattr(selected_task, 'id', None), 'success': False, 'reward': 0.0}
 
     def _step_memory(self, cycle: int, state: Dict[str, Any], low_preds: Dict[str, float], mid_preds: Dict[str, float], high_preds: Dict[str, Any], actuals: Dict[str, float], errors: Dict[str, float], selected_task: Any, reward_result: Dict[str, Any]) -> None:
         """记录记忆。"""
-        logger.debug(f"[Cycle {cycle}] STEP 8: memory_store")
+        logger.debug("[Cycle %s] STEP 8: memory_store", cycle)
         sample = self._build_memory_sample(state, low_preds, mid_preds, high_preds, actuals, errors, selected_task, reward_result)
         self._store_memory_sample(cycle, sample)
-        logger.debug(f"[Cycle {cycle}] STEP 8: memory_store DONE")
+        logger.debug("[Cycle %s] STEP 8: memory_store DONE", cycle)
 
     def _build_memory_sample(self, state: Dict[str, Any], low_preds: Dict[str, float], mid_preds: Dict[str, float], high_preds: Dict[str, Any], actuals: Dict[str, float], errors: Dict[str, float], selected_task: Any, reward_result: Dict[str, Any]) -> Dict[str, Any]:
         preds = {'low': low_preds, 'mid': mid_preds, 'high': high_preds}
@@ -570,43 +570,43 @@ class AgentLoop(BaseAgentLoop):
             if hasattr(self.memory, 'flush'):
                 self.memory.flush()
         except Exception as e:
-            logger.error(f"[Cycle {cycle}] Memory store failed: {e}")
+            logger.error("[Cycle %s] Memory store failed: %s", cycle, e)
 
     def _step_optimize(self, cycle: int, errors: Dict[str, Any]) -> None:
         """参数微修正。"""
-        logger.debug(f"[Cycle {cycle}] STEP 9: optimize")
+        logger.debug("[Cycle %s] STEP 9: optimize", cycle)
         self.optimizer.optimize(self.low_predictor, errors)
-        logger.debug(f"[Cycle {cycle}] STEP 9: optimize DONE")
+        logger.debug("[Cycle %s] STEP 9: optimize DONE", cycle)
 
     def _step_strategy(self, cycle: int, state: Dict[str, Any], high_preds: Dict[str, Any], reward_result: Dict[str, Any]) -> None:
         """高层策略更新。"""
-        logger.debug(f"[Cycle {cycle}] STEP 10: strategy_update")
+        logger.debug("[Cycle %s] STEP 10: strategy_update", cycle)
         action = high_preds.get('recommended_action', 'continue_exploration')
         self.high_predictor.update(state, action, reward_result['total_reward'])
-        logger.debug(f"[Cycle {cycle}] STEP 10: strategy_update DONE")
+        logger.debug("[Cycle %s] STEP 10: strategy_update DONE", cycle)
 
     def _step_review(self, cycle: int, state: Dict[str, Any]) -> Optional[Any]:
         """离线复盘触发。"""
-        logger.debug(f"[Cycle {cycle}] STEP 11: review_check")
+        logger.debug("[Cycle %s] STEP 11: review_check", cycle)
         review_result = self._run_review_if_needed(cycle, state)
-        logger.debug(f"[Cycle {cycle}] STEP 11: review_check DONE")
+        logger.debug("[Cycle %s] STEP 11: review_check DONE", cycle)
         return review_result
 
     def _run_review_if_needed(self, cycle: int, state: Dict[str, Any]) -> Optional[Any]:
         if self._should_review(state):
             result = self.review_engine.run_review()
             self._last_review_time = time.time()
-            logger.info(f"[Cycle {cycle}] Review completed: {result}")
+            logger.info("[Cycle %s] Review completed: %s", cycle, result)
             return result
         return None
 
     def _step_snapshot(self, cycle: int, state: Dict[str, Any], errors: Dict[str, Any], reward_result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """模型快照与回滚检查。"""
-        logger.debug(f"[Cycle {cycle}] STEP 12: snapshot")
+        logger.debug("[Cycle %s] STEP 12: snapshot", cycle)
         snapshot_info = None
         if cycle % 100 == 0:
             snapshot_info = self._create_snapshot_and_check(cycle, state, errors, reward_result)
-        logger.debug(f"[Cycle {cycle}] STEP 12: snapshot DONE")
+        logger.debug("[Cycle %s] STEP 12: snapshot DONE", cycle)
         return snapshot_info
 
     def _create_snapshot_and_check(self, cycle: int, state: Dict[str, Any], errors: Dict[str, Any], reward_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -667,14 +667,14 @@ class AgentLoop(BaseAgentLoop):
 
     def _update_task_after_execution(self, task: Any, success: bool) -> None:
         if not self.behavior_guardian.check_exploration(task.id, success):
-            logger.warning(f"Task {task.id} frozen due to consecutive failures")
+            logger.warning("Task %s frozen due to consecutive failures", task.id)
             self.task_pool.freeze_task(task.id)
 
     def _is_forbidden(self, task: Any) -> bool:
         """检查任务是否被禁止。"""
         if hasattr(task, 'target_path') and task.target_path:
             if not self.behavior_guardian.check_path(task.target_path):
-                logger.warning(f"Task {task.id} forbidden path: {task.target_path}")
+                logger.warning("Task %s forbidden path: %s", task.id, task.target_path)
                 self.task_pool.freeze_task(task.id)
                 return True
         return False
@@ -685,7 +685,7 @@ class AgentLoop(BaseAgentLoop):
             success = self._execute_action(task, state, high_preds)
             return success, 1.0 if success else 0.0
         except Exception as e:
-            logger.error(f"Task execution error: {e}")
+            logger.error("Task execution error: %s", e)
             return False, 0.0
 
     def _execute_action(self, task: Any, state: Dict[str, Any], high_preds: Dict[str, Any]) -> bool:
@@ -698,17 +698,17 @@ class AgentLoop(BaseAgentLoop):
 
     def _do_safeguard(self, task: Any, state: Dict[str, Any]) -> bool:
         """执行保护动作。"""
-        logger.info(f"Safeguard action for task {task.id}")
+        logger.info("Safeguard action for task %s", task.id)
         return True
 
     def _do_monitoring(self, task: Any, state: Dict[str, Any]) -> bool:
         """执行监控动作。"""
-        logger.info(f"Monitoring action for task {task.id}")
+        logger.info("Monitoring action for task %s", task.id)
         return True
 
     def _do_exploration(self, task: Any, state: Dict[str, Any]) -> bool:
         """执行探索动作。"""
-        logger.info(f"Exploration action for task {task.id}: {task.name}")
+        logger.info("Exploration action for task %s: %s", task.id, task.name)
         return True
 
     def _emergency_response(self, state: Dict[str, Any],
@@ -726,7 +726,7 @@ class AgentLoop(BaseAgentLoop):
         :rtype: Dict[str, Any]
         :raises: 无。
         """
-        logger.warning(f"[Cycle {cycle}] EMERGENCY RESPONSE triggered")
+        logger.warning("[Cycle %s] EMERGENCY RESPONSE triggered", cycle)
         return self._build_emergency_result(cycle, state, safety)
 
     def _build_emergency_result(self, cycle: int, state: Dict[str, Any], safety: Dict[str, Any]) -> Dict[str, Any]:
@@ -756,7 +756,7 @@ class AgentLoop(BaseAgentLoop):
 
     def _on_rollback(self, snapshot_path: str) -> None:
         """回滚回调。"""
-        logger.warning(f"Auto-rollback triggered to snapshot: {snapshot_path}")
+        logger.warning("Auto-rollback triggered to snapshot: %s", snapshot_path)
 
     def run(self, max_cycles: Optional[int] = None,
             sleep_interval: float = 1.0) -> None:
@@ -792,10 +792,10 @@ class AgentLoop(BaseAgentLoop):
         while self._running:
             try:
                 result = self.run_cycle()
-                logger.debug(f"Cycle {result['cycle']} completed in {result['duration_seconds']}s")
+                logger.debug("Cycle %s completed in %ss", result['cycle'], result['duration_seconds'])
             except Exception as e:
                 # 修复阶段116发现的bug：单步异常不应崩溃整个主循环
-                logger.error(f"Cycle {self._cycle_count} failed with exception: {type(e).__name__}: {e}", exc_info=True)
+                logger.error("Cycle %s failed with exception: %s: %s", self._cycle_count, type(e).__name__, e, exc_info=True)
                 self._cycle_count += 1
             if max_cycles is not None and self._cycle_count >= max_cycles:
                 break

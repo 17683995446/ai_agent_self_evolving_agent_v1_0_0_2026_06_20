@@ -143,7 +143,7 @@ class EventBus(BaseEventBus):
         :rtype: None
         """
         self._subscribers[event_type].append(handler)
-        logger.debug(f"Handler subscribed to {event_type}")
+        logger.debug("Handler subscribed to %s", event_type)
 
     def unsubscribe(self, event_type: str,
                     handler: Callable[[Event], Awaitable[None]]) -> bool:
@@ -170,7 +170,7 @@ class EventBus(BaseEventBus):
         :rtype: None
         """
         await self._queue.put(event)
-        logger.debug(f"Event {event.type} published")
+        logger.debug("Event %s published", event.type)
 
     def publish_sync(self, event: Event) -> None:
         """同步发布（用于非异步上下文）。
@@ -224,7 +224,7 @@ class EventBus(BaseEventBus):
             except asyncio.TimeoutError:
                 continue
             except Exception as e:
-                logger.error(f"Event dispatch error: {e}")
+                logger.error("Event dispatch error: %s", e)
 
     async def _dispatch(self, event: Event) -> None:
         """分发单个事件到所有订阅者。
@@ -246,7 +246,7 @@ class EventBus(BaseEventBus):
         try:
             await handler(event)
         except Exception as e:
-            logger.error(f"Handler error for {event.type}: {e}")
+            logger.error("Handler error for %s: %s", event.type, e)
 
     def get_stats(self) -> Dict[str, Any]:
         """获取统计信息。
@@ -347,7 +347,7 @@ class AsyncTaskScheduler(BaseAsyncTaskScheduler):
             try:
                 return await coro
             except Exception as e:
-                logger.error(f"Scheduled task error: {e}")
+                logger.error("Scheduled task error: %s", e)
                 raise
 
     def _register_task(self, task: asyncio.Task, task_id: Optional[str]) -> None:

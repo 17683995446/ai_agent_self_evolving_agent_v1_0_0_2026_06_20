@@ -311,7 +311,7 @@ class StateMachine(BaseStateMachine):
         try:
             handler(from_state, target)
         except Exception as e:
-            logger.error(f"State handler error: {e}")
+            logger.error("State handler error: %s", e)
 
     def _trigger_transition_handlers(self, transition: StateTransition) -> None:
         """触发通用转换处理器。
@@ -326,7 +326,7 @@ class StateMachine(BaseStateMachine):
         try:
             handler(transition)
         except Exception as e:
-            logger.error(f"Transition handler error: {e}")
+            logger.error("Transition handler error: %s", e)
 
     def on_enter(self, state: AgentState,
                  handler: Callable[[AgentState, AgentState], None]) -> None:

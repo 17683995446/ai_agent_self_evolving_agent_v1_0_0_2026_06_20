@@ -139,7 +139,7 @@ class BaseDaemonManager(abc.ABC):
             if pid > 0:
                 sys.exit(0)
         except OSError as e:
-            logger.error(f"Fork #1 failed: {e}")
+            logger.error("Fork #1 failed: %s", e)
             sys.exit(1)
 
     def _setup_session(self) -> None:
@@ -153,7 +153,7 @@ class BaseDaemonManager(abc.ABC):
             if pid > 0:
                 sys.exit(0)
         except OSError as e:
-            logger.error(f"Fork #2 failed: {e}")
+            logger.error("Fork #2 failed: %s", e)
             sys.exit(1)
 
     def _redirect_streams(self) -> None:
@@ -175,13 +175,13 @@ class BaseDaemonManager(abc.ABC):
 
     def _signal_handler(self, signum: int, frame: Any) -> None:
         """信号处理器"""
-        logger.info(f"Received signal {signum}, shutting down...")
+        logger.info("Received signal %s, shutting down...", signum)
         self._running = False
 
     def _run(self) -> None:
         """主运行循环"""
         self._running = True
-        logger.info(f"Daemon started (PID: {os.getpid()})")
+        logger.info("Daemon started (PID: %s)", os.getpid())
         self._execute_worker()
         self._shutdown()
 
@@ -190,7 +190,7 @@ class BaseDaemonManager(abc.ABC):
             try:
                 self._worker()
             except Exception as e:
-                logger.error(f"Worker error: {e}")
+                logger.error("Worker error: %s", e)
 
     def _shutdown(self) -> None:
         """执行关闭流程"""
@@ -204,7 +204,7 @@ class BaseDaemonManager(abc.ABC):
             try:
                 hook()
             except Exception as e:
-                logger.error(f"Shutdown hook error: {e}")
+                logger.error("Shutdown hook error: %s", e)
 
     def _write_pid(self, pid: int) -> None:
         """写入PID文件"""
@@ -285,7 +285,7 @@ class DaemonManager(BaseDaemonManager):
         :rtype: None
         """
         if self.is_running():
-            logger.error(f"Daemon already running (PID: {self._read_pid()})")
+            logger.error("Daemon already running (PID: %s)", self._read_pid())
             sys.exit(1)
 
         self._daemonize()
@@ -310,7 +310,7 @@ class DaemonManager(BaseDaemonManager):
             self._send_stop_signal(pid)
             self._wait_for_stop(pid)
             self._remove_pid()
-            logger.info(f"Daemon stopped (PID: {pid})")
+            logger.info("Daemon stopped (PID: %s)", pid)
             return True
         except ProcessLookupError:
             self._remove_pid()
@@ -319,7 +319,7 @@ class DaemonManager(BaseDaemonManager):
             return self._handle_stop_error(e)
 
     def _handle_stop_error(self, e: Exception) -> bool:
-        logger.error(f"Stop daemon error: {e}")
+        logger.error("Stop daemon error: %s", e)
         return False
 
     def _send_stop_signal(self, pid: int) -> None:
@@ -407,13 +407,13 @@ def _handle_command(daemon: DaemonManager, command: str) -> int:
     elif command == 'status':
         return _handle_status(daemon)
     else:
-        print(f"Unknown command: {command}")
+        logger.error("Unknown command: %s", command)
         return 1
 
 
 def _handle_start(daemon: DaemonManager) -> int:
     if daemon.is_running():
-        print(f"Daemon already running (PID: {daemon._read_pid()})")
+        logger.info("Daemon already running (PID: %s)", daemon._read_pid())
         return 1
     daemon.start()
     return 0
@@ -421,16 +421,16 @@ def _handle_start(daemon: DaemonManager) -> int:
 
 def _handle_stop(daemon: DaemonManager) -> int:
     if daemon.stop():
-        print("Daemon stopped")
+        logger.info("Daemon stopped")
         return 0
-    print("Daemon not running")
+    logger.info("Daemon not running")
     return 1
 
 
 def _handle_status(daemon: DaemonManager) -> int:
     status = daemon.status()
     if status['running']:
-        print(f"Daemon running (PID: {status['pid']})")
+        logger.info("Daemon running (PID: %s)", status['pid'])
     else:
-        print("Daemon not running")
+        logger.info("Daemon not running")
     return 0

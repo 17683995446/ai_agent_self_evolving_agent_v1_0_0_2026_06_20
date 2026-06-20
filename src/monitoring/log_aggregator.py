@@ -119,7 +119,7 @@ class _LogAggregator(abc.ABC):
                 all_lines = f.readlines()
             return [line.strip() for line in all_lines[-lines:]]
         except Exception as e:
-            logger.error(f"Read log file error: {e}")
+            logger.error("Read log file error: %s", e)
             return []
 
     @abc.abstractmethod
@@ -157,7 +157,7 @@ class _LogAggregator(abc.ABC):
             try:
                 handler(event)
             except Exception as e:
-                logger.error(f"Anomaly handler error: {e}")
+                logger.error("Anomaly handler error: %s", e)
 
     def on_anomaly(self, handler: Callable[[_AnomalyEvent], None]) -> None:
         """注册异常处理器"""

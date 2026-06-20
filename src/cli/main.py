@@ -3,6 +3,7 @@
 
 import abc
 import argparse
+import logging
 import sys
 import os
 import json
@@ -14,6 +15,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.core.agent_loop import AgentLoop
 from src.core.constants import DEFAULT_CONFIG_PATH
+
+logger = logging.getLogger(__name__)
 
 
 class BaseAgentCLI(abc.ABC):
@@ -52,7 +55,7 @@ class AgentCLI(BaseAgentCLI):
         signal.signal(signal.SIGTERM, self._signal_handler)
 
     def _signal_handler(self, signum: int, frame) -> None:
-        print(f"\nReceived signal {signum}, shutting down...")
+        logger.info("Received signal %s, shutting down...", signum)
         self._shutdown_requested = True
         if self.agent:
             self.agent.stop()
@@ -75,26 +78,26 @@ class AgentCLI(BaseAgentCLI):
 
     def _validate_config_path(self, config_path: str) -> bool:
         if not os.path.exists(config_path):
-            print(f"Error: Config file not found: {config_path}")
+            logger.error("Config file not found: %s", config_path)
             return False
         return True
 
     def _run_agent(self, config_path: str, args: argparse.Namespace) -> int:
-        print(f"Starting Self-Evolving Agent with config: {config_path}")
+        logger.info("Starting Self-Evolving Agent with config: %s", config_path)
         self.agent = AgentLoop(config_path)
         pid_path = os.path.join(self.agent.cfg.get('paths', {}).get('data_dir', 'data'), 'agent.pid')
         self._write_pid_file(pid_path)
-        print(f"Agent initialized. Running {args.cycles} cycles...")
+        logger.info("Agent initialized. Running %s cycles...", args.cycles)
         try:
             self.agent.run(max_cycles=args.cycles, sleep_interval=args.interval)
         except Exception as e:
-            print(f"Agent error: {e}")
+            logger.error("Agent error: %s", e)
             return 1
         finally:
             self._remove_pid_file(pid_path)
             if self.agent:
                 self.agent.stop()
-        print("Agent stopped.")
+        logger.info("Agent stopped.")
         return 0
 
     def cmd_stop(self, args: argparse.Namespace) -> int:
@@ -106,18 +109,18 @@ class AgentCLI(BaseAgentCLI):
         pid_path = os.path.join(agent.cfg.get('paths', {}).get('data_dir', 'data'), 'agent.pid')
         agent.stop()
         if not os.path.exists(pid_path):
-            print("Agent is not running (no PID file found).")
+            logger.info("Agent is not running (no PID file found).")
             return 0
         try:
             with open(pid_path, 'r') as f:
                 pid = int(f.read().strip())
             os.kill(pid, signal.SIGTERM)
-            print(f"Sent SIGTERM to Agent process {pid}.")
+            logger.info("Sent SIGTERM to Agent process %s.", pid)
         except ProcessLookupError:
-            print("Agent process not found, cleaning up PID file.")
+            logger.info("Agent process not found, cleaning up PID file.")
             self._remove_pid_file(pid_path)
         except Exception as e:
-            print(f"Error stopping agent: {e}")
+            logger.error("Error stopping agent: %s", e)
             return 1
         return 0
 
@@ -166,7 +169,7 @@ class AgentCLI(BaseAgentCLI):
 
     def _config_show(self, config_path: str) -> int:
         if not os.path.exists(config_path):
-            print(f"Config file not found: {config_path}")
+            logger.error("Config file not found: %s", config_path)
             return 1
         with open(config_path, 'r') as f:
             print(f.read())
@@ -176,21 +179,21 @@ class AgentCLI(BaseAgentCLI):
         try:
             agent = AgentLoop(config_path)
             agent.stop()
-            print("Configuration is valid.")
+            logger.info("Configuration is valid.")
         except Exception as e:
-            print(f"Configuration error: {e}")
+            logger.error("Configuration error: %s", e)
             return 1
         return 0
 
     def _config_init(self, config_path: str, force: bool) -> int:
         if os.path.exists(config_path) and not force:
-            print(f"Config already exists: {config_path}")
-            print("Use --force to overwrite.")
+            logger.error("Config already exists: %s", config_path)
+            logger.error("Use --force to overwrite.")
             return 1
         os.makedirs(os.path.dirname(config_path) or '.', exist_ok=True)
         with open(config_path, 'w') as f:
             f.write(self._default_config())
-        print(f"Default config written to: {config_path}")
+        logger.info("Default config written to: %s", config_path)
         return 0
 
     def _default_config(self) -> str:

@@ -621,7 +621,7 @@ class _DashboardServer(abc.ABC):
         self._thread.start()
 
     def _log_server_start(self) -> None:
-        logger.info(f"Dashboard server started at http://{self.host}:{self.port}")
+        logger.info("Dashboard server started at http://%s:%s", self.host, self.port)
 
     @abc.abstractmethod
     def stop(self) -> None:

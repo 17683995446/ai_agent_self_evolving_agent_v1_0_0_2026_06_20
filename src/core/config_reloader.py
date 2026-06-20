@@ -163,7 +163,7 @@ class ConfigReloader(BaseConfigReloader):
         self._running = True
         self._thread = threading.Thread(target=self._watch_loop, daemon=True)
         self._thread.start()
-        logger.info(f"ConfigReloader started watching: {self.config_path}")
+        logger.info("ConfigReloader started watching: %s", self.config_path)
 
     def stop(self) -> None:
         """停止热重载监听。
@@ -185,13 +185,13 @@ class ConfigReloader(BaseConfigReloader):
                 if self._update_file_state():
                     self._on_config_changed()
             except Exception as e:
-                logger.error(f"Config reload error: {e}")
+                logger.error("Config reload error: %s", e)
 
             time.sleep(self.check_interval)
 
     def _on_config_changed(self) -> None:
         """配置发生变化时的处理"""
-        logger.info(f"Config file changed: {self.config_path}")
+        logger.info("Config file changed: %s", self.config_path)
         new_config = self._load_config_file()
         if new_config is None:
             return
@@ -203,7 +203,7 @@ class ConfigReloader(BaseConfigReloader):
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f) or {}
         except Exception as e:
-            logger.error(f"Failed to parse config: {e}")
+            logger.error("Failed to parse config: %s", e)
             return None
 
     def _notify_callbacks(self, new_config: Dict[str, Any]) -> None:
@@ -211,7 +211,7 @@ class ConfigReloader(BaseConfigReloader):
             try:
                 callback(new_config)
             except Exception as e:
-                logger.error(f"Config callback error: {e}")
+                logger.error("Config callback error: %s", e)
 
     def force_reload(self) -> Optional[Dict[str, Any]]:
         """强制立即重载配置。
