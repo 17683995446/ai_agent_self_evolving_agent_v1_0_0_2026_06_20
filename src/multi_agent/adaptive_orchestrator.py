@@ -12,8 +12,9 @@
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from .orchestrator import MultiAgentOrchestrator
 from src.task.task_definition import Task
+
+from .orchestrator import MultiAgentOrchestrator
 
 
 def task_signature(task: Task) -> str:

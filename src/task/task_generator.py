@@ -1,7 +1,8 @@
 import abc
-from typing import Dict, List, Callable
+from typing import Callable, Dict, List
 
-from src.core.constants import TaskType, SAFE_GAP_THRESHOLD, GAIN_GAP_THRESHOLD, EFF_GAP_THRESHOLD
+from src.core.constants import EFF_GAP_THRESHOLD, GAIN_GAP_THRESHOLD, SAFE_GAP_THRESHOLD, TaskType
+
 from .task_definition import Task
 
 

@@ -1,9 +1,9 @@
 from .config import Config
 from .constants import (
-    TaskType,
+    DEFAULT_CONFIG_PATH,
     RunMode,
     SensorType,
-    DEFAULT_CONFIG_PATH,
+    TaskType,
 )
 
 __all__ = [

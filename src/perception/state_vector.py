@@ -2,12 +2,13 @@ import abc
 import logging
 import os
 import time
-import psutil
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
-from .system_sensor import SystemSensor
-from .log_sensor import LogSensor
+import psutil
+
 from .file_sensor import FileSensor
+from .log_sensor import LogSensor
+from .system_sensor import SystemSensor
 
 logger = logging.getLogger(__name__)
 

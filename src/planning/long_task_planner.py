@@ -1,12 +1,12 @@
 import logging
 import time
 import uuid
-from typing import Dict, Any, List, Optional, Callable
+from typing import Any, Callable, Dict, List, Optional
 
-from src.task.task_definition import Task
-from src.multi_agent.orchestrator import MultiAgentOrchestrator
-from src.multi_agent.agent_worker import AgentWorker
 from src.memory.long_term import LongTermMemory
+from src.multi_agent.agent_worker import AgentWorker
+from src.multi_agent.orchestrator import MultiAgentOrchestrator
+from src.task.task_definition import Task
 
 logger = logging.getLogger(__name__)
 

@@ -1,9 +1,9 @@
-from .skill import Skill
-from .skill_registry import SkillRegistry
-from .skill_learner import SkillLearner
-from .skill_composer import SkillDiscovery, SkillComposer
-from .skill_persistence import SkillPersistence
 from .capability_assessor import CapabilityAssessor, GapAnalyzer
+from .skill import Skill
+from .skill_composer import SkillComposer, SkillDiscovery
+from .skill_learner import SkillLearner
+from .skill_persistence import SkillPersistence
+from .skill_registry import SkillRegistry
 
 __all__ = [
     'Skill',

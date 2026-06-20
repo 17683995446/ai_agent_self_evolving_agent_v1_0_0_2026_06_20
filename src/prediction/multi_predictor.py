@@ -1,8 +1,8 @@
 import abc
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
-from .base_predictor import ExponentialSmoother, AdaptiveExponentialSmoother, SimpleMovingAverage
 from .arima_predictor import ARIMAModel
+from .base_predictor import AdaptiveExponentialSmoother, ExponentialSmoother, SimpleMovingAverage
 
 
 class BaseMultiPredictor(abc.ABC):

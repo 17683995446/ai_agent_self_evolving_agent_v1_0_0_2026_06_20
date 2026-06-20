@@ -1,8 +1,8 @@
 import abc
 import os
 import time
-from typing import Dict, Any, List, Optional, Tuple
 from collections import deque
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.core.constants import DEFAULT_WATCH_PATHS
 

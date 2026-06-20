@@ -1,9 +1,9 @@
 import abc
-import os
-import time
-import threading
 import logging
-from typing import Callable, Dict, Any, Optional
+import os
+import threading
+import time
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

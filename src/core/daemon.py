@@ -2,15 +2,15 @@
 """系统服务守护进程管理器"""
 
 import abc
-import os
-import sys
-import time
-import signal
 import atexit
 import logging
-from typing import Optional, Callable, List, Any, Dict
+import os
+import signal
+import sys
+import time
+from typing import Any, Callable, Dict, List, Optional
 
-from .constants import DAEMON_PID_FILE, DAEMON_WORKING_DIR, DAEMON_UMASK
+from .constants import DAEMON_PID_FILE, DAEMON_UMASK, DAEMON_WORKING_DIR
 
 logger = logging.getLogger(__name__)
 

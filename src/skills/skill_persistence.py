@@ -15,9 +15,10 @@ import logging
 import pickle
 from typing import Any, Dict, List, Optional
 
+from src.memory.long_term import BaseLongTermMemory
+
 from .skill import Skill
 from .skill_registry import SkillRegistry
-from src.memory.long_term import BaseLongTermMemory
 
 logger = logging.getLogger(__name__)
 

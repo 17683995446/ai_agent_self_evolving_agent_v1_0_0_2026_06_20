@@ -1,10 +1,11 @@
+import threading
 import time
 import uuid
-import threading
-from typing import Dict, Any, List, Optional, Callable
+from typing import Any, Callable, Dict, List, Optional
+
+from src.task.task_definition import Task
 
 from .agent_worker import AgentWorker
-from src.task.task_definition import Task
 
 
 class MultiAgentOrchestrator:

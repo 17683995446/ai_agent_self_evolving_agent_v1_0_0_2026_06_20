@@ -1,5 +1,5 @@
-from typing import Dict, Any, List, Optional
 from collections import deque
+from typing import Any, Dict, List, Optional
 
 
 class BaseRestructureTrigger:

@@ -1,8 +1,9 @@
 import abc
 import logging
 import time
+from typing import Any, Dict, List, Optional, Tuple
+
 import psutil
-from typing import Dict, Any, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

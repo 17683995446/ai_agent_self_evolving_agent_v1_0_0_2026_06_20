@@ -1,7 +1,7 @@
-from typing import List, Optional, Dict, Any
-from collections import deque
 import logging
 import threading
+from collections import deque
+from typing import Any, Dict, List, Optional
 
 from .base_predictor import BasePredictor
 

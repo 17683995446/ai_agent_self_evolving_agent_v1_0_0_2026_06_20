@@ -1,10 +1,10 @@
 import abc
-from typing import Dict, Any, List, Optional
-from collections import deque
 import time
+from collections import deque
+from typing import Any, Dict, List, Optional
 
-from .base_predictor import AdaptiveExponentialSmoother
 from .arima_predictor import ARIMAModel
+from .base_predictor import AdaptiveExponentialSmoother
 
 
 class BaseLayerPredictor(abc.ABC):

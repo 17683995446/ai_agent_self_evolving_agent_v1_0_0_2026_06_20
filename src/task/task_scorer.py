@@ -1,6 +1,6 @@
 import abc
 import time
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 from .task_definition import Task
 

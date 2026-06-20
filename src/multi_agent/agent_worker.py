@@ -1,11 +1,11 @@
 import time
 import uuid
-from typing import Dict, Any, List, Optional, Callable
+from typing import Any, Callable, Dict, List, Optional
 
-from src.task.task_pool import TaskPool
-from src.task.task_definition import Task
-from src.skills.skill_registry import SkillRegistry
 from src.skills.skill_learner import SkillLearner
+from src.skills.skill_registry import SkillRegistry
+from src.task.task_definition import Task
+from src.task.task_pool import TaskPool
 
 
 class AgentWorker:

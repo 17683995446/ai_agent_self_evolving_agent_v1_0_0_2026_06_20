@@ -1,7 +1,7 @@
 import abc
 import math
-from typing import List, Optional, Dict, Any
 from collections import deque
+from typing import Any, Dict, List, Optional
 
 
 class BasePredictor(abc.ABC):

@@ -1,5 +1,5 @@
-from typing import Dict, Any, List, Set
 from collections import deque
+from typing import Any, Dict, List, Set
 
 
 class BaseFeatureManager:

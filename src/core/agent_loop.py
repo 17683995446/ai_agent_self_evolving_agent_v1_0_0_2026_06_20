@@ -1,30 +1,30 @@
 import abc
-import os
-import time
 import logging
+import os
 import threading
-from typing import Dict, Any, Optional, Tuple
+import time
 from collections import deque
+from typing import Any, Dict, Optional, Tuple
+
+from src.dashboard.server import DashboardServer
+from src.drive.reward_engine import RewardEngine
+from src.memory.review_engine import ReviewEngine
+from src.memory.short_term import ShortTermMemory
+from src.monitoring.alert_manager import AlertManager
+from src.optimization.auto_rollback import AutoRollback
+from src.optimization.micro_optimizer import MicroOptimizer
+from src.optimization.snapshot_manager import SnapshotManager
+from src.perception.state_vector import StateVector
+from src.prediction.error_evaluator import ErrorEvaluator
+from src.prediction.layered_predictor import HighLevelPredictor, LowLevelPredictor, MidLevelPredictor
+from src.safety.guardian import BehaviorGuardian, ResourceGuardian, SafetyEnforcer
+from src.task.task_generator import TaskGenerator
+from src.task.task_pool import TaskPool
 
 from .config import Config
 from .constants import DEFAULT_CONFIG_PATH
-from .logging_config import SafeRotatingFileHandler, LoggingConfigurator
+from .logging_config import LoggingConfigurator, SafeRotatingFileHandler
 from .task_executor import TaskExecutor
-from src.perception.state_vector import StateVector
-from src.prediction.layered_predictor import LowLevelPredictor, MidLevelPredictor, HighLevelPredictor
-from src.prediction.error_evaluator import ErrorEvaluator
-from src.drive.reward_engine import RewardEngine
-from src.task.task_pool import TaskPool
-from src.task.task_generator import TaskGenerator
-from src.memory.short_term import ShortTermMemory
-from src.memory.review_engine import ReviewEngine
-from src.optimization.micro_optimizer import MicroOptimizer
-from src.optimization.snapshot_manager import SnapshotManager
-from src.optimization.auto_rollback import AutoRollback
-from src.safety.guardian import ResourceGuardian, BehaviorGuardian, SafetyEnforcer
-from src.dashboard.server import DashboardServer
-from src.monitoring.alert_manager import AlertManager
-
 
 logger = logging.getLogger(__name__)
 

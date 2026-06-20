@@ -1,15 +1,20 @@
 import abc
 import logging
-import numpy as np
-from typing import Dict, Any, List, Optional
 from collections import deque
+from typing import Any, Dict, List, Optional
+
+import numpy as np
 
 from src.core.constants import (
-    CPU_HIGH_RISK, CPU_MED_RISK,
-    MEM_HIGH_RISK, MEM_MED_RISK,
+    CPU_HIGH_RISK,
+    CPU_MED_RISK,
     DISK_HIGH_RISK,
-    ERROR_HIGH_RATE, ERROR_MED_RATE,
-    TARGET_SELF_CPU, TARGET_SELF_MEM_MB,
+    ERROR_HIGH_RATE,
+    ERROR_MED_RATE,
+    MEM_HIGH_RISK,
+    MEM_MED_RISK,
+    TARGET_SELF_CPU,
+    TARGET_SELF_MEM_MB,
 )
 
 logger = logging.getLogger(__name__)

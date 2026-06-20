@@ -1,6 +1,6 @@
 import abc
 import logging
-from typing import Dict, Any, Optional, Callable
+from typing import Any, Callable, Dict, Optional
 
 from .snapshot_manager import SnapshotManager
 

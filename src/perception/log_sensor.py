@@ -3,8 +3,8 @@ import logging
 import os
 import re
 import time
-from typing import Dict, Any, List, Optional, Tuple, Set
 from collections import deque
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from src.core.constants import DEFAULT_LOG_PATHS
 

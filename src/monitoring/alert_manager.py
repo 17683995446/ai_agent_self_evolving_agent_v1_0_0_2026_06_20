@@ -3,8 +3,8 @@ import json
 import logging
 import threading
 import time
-from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

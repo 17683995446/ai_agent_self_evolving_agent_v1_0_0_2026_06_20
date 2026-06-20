@@ -1,10 +1,10 @@
 """全链路运行时追踪器：为每个模块提供详细的执行日志"""
 
 import abc
-import time
 import logging
-from typing import Any, Dict, Optional
+import time
 from contextlib import contextmanager
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

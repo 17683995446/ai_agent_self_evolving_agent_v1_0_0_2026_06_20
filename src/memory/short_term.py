@@ -5,7 +5,7 @@ import os
 import sqlite3
 import threading
 import time
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from src.core.constants import DEFAULT_MEMORY_DB_PATH
 

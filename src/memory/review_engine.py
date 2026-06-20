@@ -1,10 +1,10 @@
 import abc
 import time
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
+from ..optimization.micro_optimizer import MicroOptimizer
 from .short_term import ShortTermMemory
 from .value_scorer import ValueScorer
-from ..optimization.micro_optimizer import MicroOptimizer
 
 
 class BaseReviewEngine(abc.ABC):

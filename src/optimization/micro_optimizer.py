@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import abc
-from typing import Dict, Any, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
 import numpy as np
 
 if TYPE_CHECKING:

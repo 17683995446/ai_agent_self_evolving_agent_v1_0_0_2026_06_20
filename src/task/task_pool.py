@@ -1,9 +1,10 @@
 import abc
-import time
 import threading
-from typing import Dict, Any, List, Optional
+import time
+from typing import Any, Dict, List, Optional
 
 from src.core.constants import TaskType
+
 from .task_definition import Task
 from .task_generator import TaskGenerator
 from .task_scorer import TaskScorer
