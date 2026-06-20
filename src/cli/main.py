@@ -1066,6 +1066,228 @@ paths:
         except (json.JSONDecodeError, OSError):
             return []
 
+    def cmd_cleanup(self, args: argparse.Namespace) -> int:
+        """清理旧数据：快照、轮转日志、记忆数据库碎片。
+
+        :param args: 命令行参数，支持 --keep-snapshots/--keep-logs/--vacuum-db/--dry-run。
+        :type args: argparse.Namespace
+        :return: 成功返回0。
+        :rtype: int
+        """
+        config_path = args.config or DEFAULT_CONFIG_PATH
+        if not self._validate_config_path(config_path):
+            return 1
+
+        cfg = self._load_config(config_path)
+        data_dir = cfg.get('paths', {}).get('data_dir', 'data')
+        log_dir = cfg.get('paths', {}).get('log_dir', 'logs')
+        snapshot_dir = cfg.get('paths', {}).get('snapshot_dir', 'snapshots')
+
+        keep_snapshots = args.keep_snapshots if args.keep_snapshots is not None \
+            else cfg.get('resource_limits', {}).get('max_snapshot_count', 10)
+        keep_logs = args.keep_logs if args.keep_logs is not None \
+            else cfg.get('logging', {}).get('backup_count', 5)
+        dry_run = args.dry_run
+
+        print("=" * 50)
+        print("Self-Evolving Agent - Data Cleanup")
+        if dry_run:
+            print("  (DRY RUN - no files will be deleted)")
+        print("=" * 50)
+        print()
+
+        total_freed = 0
+        total_freed += self._cleanup_snapshots(snapshot_dir, keep_snapshots, dry_run)
+        total_freed += self._cleanup_logs(log_dir, keep_logs, dry_run)
+
+        if args.vacuum_db:
+            total_freed += self._vacuum_memory_db(data_dir, dry_run)
+
+        print()
+        print("-" * 50)
+        if dry_run:
+            print(f"Would free approximately {self._format_size(total_freed)}")
+        else:
+            print(f"Freed approximately {self._format_size(total_freed)}")
+        print("=" * 50)
+        return 0
+
+    def _load_config(self, config_path: str) -> Dict[str, Any]:
+        """加载配置文件，失败时返回空字典。"""
+        try:
+            import yaml
+            with open(config_path, 'r', encoding='utf-8') as f:
+                return yaml.safe_load(f) or {}
+        except Exception:
+            return {}
+
+    def _cleanup_snapshots(self, snapshot_dir: str, keep: int,
+                           dry_run: bool) -> int:
+        """清理旧快照文件，保留最近 N 个，并清除孤立文件。
+
+        :param snapshot_dir: 快照目录。
+        :param keep: 保留的快照数量。
+        :param dry_run: 仅模拟不实际删除。
+        :return: 释放的字节数。
+        """
+        index_path = os.path.join(snapshot_dir, 'index.json')
+        if not os.path.exists(snapshot_dir):
+            print(f"[snapshots] Directory not found: {snapshot_dir}")
+            return 0
+
+        # 收集磁盘上所有 .pkl 文件
+        all_pkl = set(
+            f for f in os.listdir(snapshot_dir) if f.endswith('.pkl')
+        )
+
+        entries = self._load_snapshot_index(index_path)
+        if entries:
+            entries_sorted = sorted(entries, key=lambda e: e.get('timestamp', 0))
+            indexed_files = [os.path.basename(e.get('filepath', '')) for e in entries_sorted]
+            indexed_files = [f for f in indexed_files if f]
+        else:
+            indexed_files = sorted(
+                all_pkl,
+                key=lambda f: os.path.getmtime(os.path.join(snapshot_dir, f))
+            )
+
+        # 识别孤立文件（在磁盘上但不在索引中）
+        indexed_set = set(indexed_files)
+        orphaned = all_pkl - indexed_set
+
+        freed = 0
+        if orphaned:
+            print(f"[snapshots] {len(orphaned)} orphaned files (not in index).")
+            for fname in sorted(orphaned):
+                fpath = os.path.join(snapshot_dir, fname)
+                size = os.path.getsize(fpath)
+                if not dry_run:
+                    os.remove(fpath)
+                freed += size
+                print(f"  {'[DRY] ' if dry_run else ''}removed orphan: {fname} "
+                      f"({self._format_size(size)})")
+
+        if len(indexed_files) <= keep:
+            print(f"[snapshots] {len(indexed_files)} indexed files, keep={keep}, "
+                  f"nothing to trim.")
+            return freed
+
+        to_remove = indexed_files[:-keep] if keep > 0 else indexed_files
+        print(f"[snapshots] {len(indexed_files)} indexed files, keeping {keep}, "
+              f"removing {len(to_remove)}.")
+
+        for fname in to_remove:
+            fpath = os.path.join(snapshot_dir, fname)
+            if not os.path.exists(fpath):
+                continue
+            size = os.path.getsize(fpath)
+            if not dry_run:
+                os.remove(fpath)
+            freed += size
+            print(f"  {'[DRY] ' if dry_run else ''}removed: {fname} "
+                  f"({self._format_size(size)})")
+
+        if not dry_run and to_remove:
+            kept_entries = entries[-keep:] if isinstance(entries, list) and entries else []
+            if kept_entries:
+                with open(index_path, 'w', encoding='utf-8') as f:
+                    json.dump(kept_entries, f, indent=2)
+                print(f"  updated index.json: {len(kept_entries)} entries remain.")
+
+        return freed
+
+    def _load_snapshot_index(self, index_path: str) -> List[Dict[str, Any]]:
+        """加载快照索引文件。"""
+        if not os.path.exists(index_path):
+            return []
+        try:
+            with open(index_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return data if isinstance(data, list) else []
+        except (json.JSONDecodeError, OSError):
+            return []
+
+    def _cleanup_logs(self, log_dir: str, keep: int,
+                      dry_run: bool) -> int:
+        """清理轮转的旧日志文件，保留最近 N 个。
+
+        :param log_dir: 日志目录。
+        :param keep: 保留的轮转日志数量（不含当前 agent.log）。
+        :param dry_run: 仅模拟不实际删除。
+        :return: 释放的字节数。
+        """
+        if not os.path.exists(log_dir):
+            print(f"[logs] Directory not found: {log_dir}")
+            return 0
+
+        rotated = []
+        for fname in os.listdir(log_dir):
+            if fname.startswith('agent.log.') and not fname.endswith('.lck'):
+                fpath = os.path.join(log_dir, fname)
+                if os.path.isfile(fpath):
+                    rotated.append((fname, fpath, os.path.getmtime(fpath)))
+
+        if not rotated:
+            print(f"[logs] No rotated log files found in {log_dir}.")
+            return 0
+
+        rotated.sort(key=lambda x: x[2], reverse=True)
+        to_remove = rotated[keep:] if keep > 0 else rotated
+        print(f"[logs] {len(rotated)} rotated files, keeping {keep}, removing {len(to_remove)}.")
+
+        freed = 0
+        for fname, fpath, _ in to_remove:
+            size = os.path.getsize(fpath)
+            if not dry_run:
+                os.remove(fpath)
+            freed += size
+            print(f"  {'[DRY] ' if dry_run else ''}removed: {fname} ({self._format_size(size)})")
+
+        return freed
+
+    def _vacuum_memory_db(self, data_dir: str, dry_run: bool) -> int:
+        """对记忆数据库执行 VACUUM 回收碎片空间。
+
+        :param data_dir: 数据目录。
+        :param dry_run: 仅模拟不实际执行。
+        :return: 释放的字节数。
+        """
+        db_path = os.path.join(data_dir, 'memory.db')
+        if not os.path.exists(db_path):
+            print(f"[db] Memory database not found: {db_path}")
+            return 0
+
+        size_before = os.path.getsize(db_path)
+        print(f"[db] Memory database: {self._format_size(size_before)}")
+
+        if dry_run:
+            print("  [DRY] would VACUUM (estimate ~10-30% reclaimable)")
+            return 0
+
+        try:
+            import sqlite3
+            conn = sqlite3.connect(db_path)
+            conn.execute('VACUUM')
+            conn.close()
+            size_after = os.path.getsize(db_path)
+            freed = size_before - size_after
+            print(f"  VACUUM complete: {self._format_size(size_before)} -> "
+                  f"{self._format_size(size_after)} (freed {self._format_size(freed)})")
+            return max(freed, 0)
+        except sqlite3.Error as e:
+            print(f"  VACUUM failed: {e}")
+            return 0
+
+    def _format_size(self, size: int) -> str:
+        """将字节数格式化为人类可读的大小字符串。"""
+        if size < 1024:
+            return f"{size} B"
+        elif size < 1024 * 1024:
+            return f"{size / 1024:.1f} KB"
+        elif size < 1024 * 1024 * 1024:
+            return f"{size / (1024 * 1024):.1f} MB"
+        return f"{size / (1024 * 1024 * 1024):.2f} GB"
+
 
 def _resolve_config_path(args_config: Optional[str]) -> str:
     if args_config:
@@ -1142,6 +1364,18 @@ Examples:
     dashboard_parser.add_argument('--port', '-p', type=int, default=8080,
                                   help='Dashboard port (default: 8080)')
 
+    # cleanup
+    cleanup_parser = subparsers.add_parser(
+        'cleanup', help='Clean up old snapshots, rotated logs, vacuum DB')
+    cleanup_parser.add_argument('--keep-snapshots', type=int, default=None,
+                                help='Number of snapshots to keep (default: from config)')
+    cleanup_parser.add_argument('--keep-logs', type=int, default=None,
+                                help='Number of rotated logs to keep (default: from config)')
+    cleanup_parser.add_argument('--vacuum-db', action='store_true',
+                                help='Vacuum memory database to reclaim space')
+    cleanup_parser.add_argument('--dry-run', action='store_true',
+                                help='Show what would be cleaned without deleting')
+
     args = parser.parse_args()
 
     if not args.command:
@@ -1160,6 +1394,7 @@ Examples:
         'logs': cli.cmd_logs,
         'quickstart': cli.cmd_quickstart,
         'dashboard': cli.cmd_dashboard,
+        'cleanup': cli.cmd_cleanup,
     }
 
     handler = command_map.get(args.command)

@@ -80,6 +80,7 @@ self-evolving-agent <command> [options]
 | `logs` | 查看最近日志 | `logs --lines 20` |
 | `quickstart` | 一键体验（doctor+init+cycle+status） | `quickstart` |
 | `dashboard` | 启动监控仪表盘 Web UI | `dashboard --port 8080` |
+| `cleanup` | 清理旧快照/日志/数据库碎片 | `cleanup --dry-run` |
 | `config show` | 查看当前配置 | `config show` |
 | `config validate` | 校验配置合法性 | `config validate` |
 | `config init` | 生成默认配置文件 | `config init --force` |
