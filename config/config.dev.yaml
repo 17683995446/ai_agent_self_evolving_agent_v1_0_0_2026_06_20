@@ -31,7 +31,7 @@ safety:
   max_consecutive_failures: 10
   forbidden_paths:
     - /boot
-    - /etc/shadow
+    - /etc
     - /proc
     - /sys
     - /dev

@@ -1,3 +1,5 @@
+# WARNING: 测试环境配置，含极端值（CPU/内存上限100%），严禁用于生产环境
+# 生产环境请使用 config.prod.yaml
 goals:
   precision_evolution: true
   coverage_evolution: true
@@ -31,7 +33,7 @@ safety:
   max_consecutive_failures: 5
   forbidden_paths:
     - /boot
-    - /etc/shadow
+    - /etc
     - /proc
     - /sys
     - /dev
