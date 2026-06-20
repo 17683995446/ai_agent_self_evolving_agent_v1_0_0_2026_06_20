@@ -435,7 +435,7 @@ class AgentCLI(BaseAgentCLI):
         if args.action == 'show':
             return self._config_show(config_path)
         elif args.action == 'validate':
-            return self._config_validate(config_path)
+            return self._config_validate(config_path, args)
         elif args.action == 'init':
             return self._config_init(config_path, args.force)
         elif args.action == 'wizard':
@@ -450,15 +450,30 @@ class AgentCLI(BaseAgentCLI):
             print(f.read())
         return 0
 
-    def _config_validate(self, config_path: str) -> int:
+    def _config_validate(self, config_path: str,
+                         args: Optional[argparse.Namespace] = None) -> int:
         """校验配置文件的字段合法性，输出友好的错误提示。
 
         :param config_path: 配置文件路径。
         :type config_path: str
+        :param args: 命令行参数（用于检测 --json），可选。
+        :type args: Optional[argparse.Namespace]
         :return: 全部校验通过返回0，存在错误返回1。
         :rtype: int
         """
         errors = self._validate_config_fields(config_path)
+        json_output = getattr(args, 'json', False) if args else False
+
+        if json_output:
+            result = {
+                'config_path': config_path,
+                'valid': len(errors) == 0,
+                'error_count': len(errors),
+                'errors': errors,
+            }
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            return 0 if not errors else 1
+
         if not errors:
             print(_color.ok(f"Configuration is valid: {config_path}"))
             return 0
@@ -920,9 +935,6 @@ paths:
         :return: 全部通过返回0，存在问题返回1。
         :rtype: int
         """
-        print(f"Self-Evolving Agent v{_get_version()} - Health Check")
-        print("=" * SEPARATOR_WIDTH)
-
         checks: List[Tuple[str, bool, str]] = []
         checks.extend(self._check_python_version())
         checks.extend(self._check_dependencies())
@@ -931,6 +943,25 @@ paths:
 
         passed = sum(1 for _, ok, _ in checks if ok)
         total = len(checks)
+
+        # JSON 输出模式
+        if getattr(args, 'json', False):
+            result = {
+                'version': _get_version(),
+                'passed': passed,
+                'total': total,
+                'all_passed': passed == total,
+                'checks': [
+                    {'name': name, 'ok': ok, 'message': msg}
+                    for name, ok, msg in checks
+                ],
+            }
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            return 0 if passed == total else 1
+
+        # 文本输出模式
+        print(f"Self-Evolving Agent v{_get_version()} - Health Check")
+        print("=" * SEPARATOR_WIDTH)
         for name, ok, msg in checks:
             if ok:
                 status = _color.ok("[OK]  ")
@@ -1302,7 +1333,35 @@ paths:
         keep_logs = args.keep_logs if args.keep_logs is not None \
             else cfg.get('logging', {}).get('backup_count', 5)
         dry_run = args.dry_run
+        json_output = getattr(args, 'json', False)
 
+        # 收集结构化结果（用于 JSON 输出）
+        snap_result = self._cleanup_snapshots(snapshot_dir, keep_snapshots, dry_run)
+        logs_result = self._cleanup_logs(log_dir, keep_logs, dry_run)
+        db_result = {'enabled': args.vacuum_db, 'freed_bytes': 0,
+                     'size_before': 0, 'size_after': 0}
+        if args.vacuum_db:
+            db_result = self._vacuum_memory_db(data_dir, dry_run)
+
+        total_freed = (snap_result['freed_bytes'] + logs_result['freed_bytes']
+                       + db_result.get('freed_bytes', 0))
+
+        # JSON 输出模式
+        if json_output:
+            result = {
+                'dry_run': dry_run,
+                'total_freed_bytes': total_freed,
+                'total_freed_human': self._format_size(total_freed),
+                'categories': {
+                    'snapshots': snap_result,
+                    'logs': logs_result,
+                    'vacuum_db': db_result,
+                },
+            }
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            return 0
+
+        # 文本输出模式
         print("=" * SEPARATOR_WIDTH)
         print("Self-Evolving Agent - Data Cleanup")
         if dry_run:
@@ -1310,12 +1369,13 @@ paths:
         print("=" * SEPARATOR_WIDTH)
         print()
 
-        total_freed = 0
-        total_freed += self._cleanup_snapshots(snapshot_dir, keep_snapshots, dry_run)
-        total_freed += self._cleanup_logs(log_dir, keep_logs, dry_run)
-
+        for line in snap_result['details']:
+            print(line)
+        for line in logs_result['details']:
+            print(line)
         if args.vacuum_db:
-            total_freed += self._vacuum_memory_db(data_dir, dry_run)
+            for line in db_result.get('details', []):
+                print(line)
 
         print()
         print("-" * SEPARATOR_WIDTH)
@@ -1341,18 +1401,21 @@ paths:
             return {}
 
     def _cleanup_snapshots(self, snapshot_dir: str, keep: int,
-                           dry_run: bool) -> int:
+                           dry_run: bool) -> Dict[str, Any]:
         """清理旧快照文件，保留最近 N 个，并清除孤立文件。
 
         :param snapshot_dir: 快照目录。
         :param keep: 保留的快照数量。
         :param dry_run: 仅模拟不实际删除。
-        :return: 释放的字节数。
+        :return: 结构化清理结果（freed_bytes/details/orphaned_removed/indexed_removed/kept）。
+        :rtype: Dict[str, Any]
         """
         index_path = os.path.join(snapshot_dir, 'index.json')
+        details: List[str] = []
         if not os.path.exists(snapshot_dir):
-            print(f"[snapshots] Directory not found: {snapshot_dir}")
-            return 0
+            details.append(f"[snapshots] Directory not found: {snapshot_dir}")
+            return {'freed_bytes': 0, 'details': details,
+                    'orphaned_removed': 0, 'indexed_removed': 0, 'kept': 0}
 
         # 收集磁盘上所有 .pkl 文件
         all_pkl = set(
@@ -1375,26 +1438,31 @@ paths:
         orphaned = all_pkl - indexed_set
 
         freed = 0
+        orphaned_removed = 0
         if orphaned:
-            print(f"[snapshots] {len(orphaned)} orphaned files (not in index).")
+            details.append(f"[snapshots] {len(orphaned)} orphaned files (not in index).")
             for fname in sorted(orphaned):
                 fpath = os.path.join(snapshot_dir, fname)
                 size = os.path.getsize(fpath)
                 if not dry_run:
                     os.remove(fpath)
                 freed += size
-                print(f"  {'[DRY] ' if dry_run else ''}removed orphan: {fname} "
-                      f"({self._format_size(size)})")
+                orphaned_removed += 1
+                details.append(f"  {'[DRY] ' if dry_run else ''}removed orphan: {fname} "
+                               f"({self._format_size(size)})")
 
         if len(indexed_files) <= keep:
-            print(f"[snapshots] {len(indexed_files)} indexed files, keep={keep}, "
-                  f"nothing to trim.")
-            return freed
+            details.append(f"[snapshots] {len(indexed_files)} indexed files, keep={keep}, "
+                           f"nothing to trim.")
+            return {'freed_bytes': freed, 'details': details,
+                    'orphaned_removed': orphaned_removed, 'indexed_removed': 0,
+                    'kept': len(indexed_files)}
 
         to_remove = indexed_files[:-keep] if keep > 0 else indexed_files
-        print(f"[snapshots] {len(indexed_files)} indexed files, keeping {keep}, "
-              f"removing {len(to_remove)}.")
+        details.append(f"[snapshots] {len(indexed_files)} indexed files, keeping {keep}, "
+                       f"removing {len(to_remove)}.")
 
+        indexed_removed = 0
         for fname in to_remove:
             fpath = os.path.join(snapshot_dir, fname)
             if not os.path.exists(fpath):
@@ -1403,17 +1471,21 @@ paths:
             if not dry_run:
                 os.remove(fpath)
             freed += size
-            print(f"  {'[DRY] ' if dry_run else ''}removed: {fname} "
-                  f"({self._format_size(size)})")
+            indexed_removed += 1
+            details.append(f"  {'[DRY] ' if dry_run else ''}removed: {fname} "
+                           f"({self._format_size(size)})")
 
         if not dry_run and to_remove:
             kept_entries = entries[-keep:] if isinstance(entries, list) and entries else []
             if kept_entries:
                 with open(index_path, 'w', encoding='utf-8') as f:
                     json.dump(kept_entries, f, indent=2)
-                print(f"  updated index.json: {len(kept_entries)} entries remain.")
+                details.append(f"  updated index.json: {len(kept_entries)} entries remain.")
 
-        return freed
+        return {'freed_bytes': freed, 'details': details,
+                'orphaned_removed': orphaned_removed,
+                'indexed_removed': indexed_removed,
+                'kept': max(len(indexed_files) - indexed_removed, 0)}
 
     def _load_snapshot_index(self, index_path: str) -> List[Dict[str, Any]]:
         """加载快照索引文件。"""
@@ -1428,17 +1500,20 @@ paths:
             return []
 
     def _cleanup_logs(self, log_dir: str, keep: int,
-                      dry_run: bool) -> int:
+                      dry_run: bool) -> Dict[str, Any]:
         """清理轮转的旧日志文件，保留最近 N 个。
 
         :param log_dir: 日志目录。
         :param keep: 保留的轮转日志数量（不含当前 agent.log）。
         :param dry_run: 仅模拟不实际删除。
-        :return: 释放的字节数。
+        :return: 结构化清理结果（freed_bytes/details/rotated_total/removed/kept）。
+        :rtype: Dict[str, Any]
         """
+        details: List[str] = []
         if not os.path.exists(log_dir):
-            print(f"[logs] Directory not found: {log_dir}")
-            return 0
+            details.append(f"[logs] Directory not found: {log_dir}")
+            return {'freed_bytes': 0, 'details': details,
+                    'rotated_total': 0, 'removed': 0, 'kept': 0}
 
         rotated = []
         for fname in os.listdir(log_dir):
@@ -1448,41 +1523,54 @@ paths:
                     rotated.append((fname, fpath, os.path.getmtime(fpath)))
 
         if not rotated:
-            print(f"[logs] No rotated log files found in {log_dir}.")
-            return 0
+            details.append(f"[logs] No rotated log files found in {log_dir}.")
+            return {'freed_bytes': 0, 'details': details,
+                    'rotated_total': 0, 'removed': 0, 'kept': 0}
 
         rotated.sort(key=lambda x: x[2], reverse=True)
         to_remove = rotated[keep:] if keep > 0 else rotated
-        print(f"[logs] {len(rotated)} rotated files, keeping {keep}, removing {len(to_remove)}.")
+        details.append(f"[logs] {len(rotated)} rotated files, keeping {keep}, "
+                       f"removing {len(to_remove)}.")
 
         freed = 0
+        removed_count = 0
         for fname, fpath, _ in to_remove:
             size = os.path.getsize(fpath)
             if not dry_run:
                 os.remove(fpath)
             freed += size
-            print(f"  {'[DRY] ' if dry_run else ''}removed: {fname} ({self._format_size(size)})")
+            removed_count += 1
+            details.append(f"  {'[DRY] ' if dry_run else ''}removed: {fname} "
+                           f"({self._format_size(size)})")
 
-        return freed
+        return {'freed_bytes': freed, 'details': details,
+                'rotated_total': len(rotated),
+                'removed': removed_count,
+                'kept': len(rotated) - removed_count}
 
-    def _vacuum_memory_db(self, data_dir: str, dry_run: bool) -> int:
+    def _vacuum_memory_db(self, data_dir: str,
+                          dry_run: bool) -> Dict[str, Any]:
         """对记忆数据库执行 VACUUM 回收碎片空间。
 
         :param data_dir: 数据目录。
         :param dry_run: 仅模拟不实际执行。
-        :return: 释放的字节数。
+        :return: 结构化清理结果（enabled/freed_bytes/size_before/size_after/details）。
+        :rtype: Dict[str, Any]
         """
+        details: List[str] = []
         db_path = os.path.join(data_dir, 'memory.db')
         if not os.path.exists(db_path):
-            print(f"[db] Memory database not found: {db_path}")
-            return 0
+            details.append(f"[db] Memory database not found: {db_path}")
+            return {'enabled': True, 'freed_bytes': 0, 'size_before': 0,
+                    'size_after': 0, 'details': details}
 
         size_before = os.path.getsize(db_path)
-        print(f"[db] Memory database: {self._format_size(size_before)}")
+        details.append(f"[db] Memory database: {self._format_size(size_before)}")
 
         if dry_run:
-            print("  [DRY] would VACUUM (estimate ~10-30% reclaimable)")
-            return 0
+            details.append("  [DRY] would VACUUM (estimate ~10-30% reclaimable)")
+            return {'enabled': True, 'freed_bytes': 0, 'size_before': size_before,
+                    'size_after': size_before, 'details': details}
 
         try:
             import sqlite3
@@ -1491,12 +1579,16 @@ paths:
             conn.close()
             size_after = os.path.getsize(db_path)
             freed = size_before - size_after
-            print(f"  VACUUM complete: {self._format_size(size_before)} -> "
-                  f"{self._format_size(size_after)} (freed {self._format_size(freed)})")
-            return max(freed, 0)
+            details.append(f"  VACUUM complete: {self._format_size(size_before)} -> "
+                           f"{self._format_size(size_after)} "
+                           f"(freed {self._format_size(freed)})")
+            return {'enabled': True, 'freed_bytes': max(freed, 0),
+                    'size_before': size_before, 'size_after': size_after,
+                    'details': details}
         except sqlite3.Error as e:
-            print(f"  VACUUM failed: {e}")
-            return 0
+            details.append(f"  VACUUM failed: {e}")
+            return {'enabled': True, 'freed_bytes': 0, 'size_before': size_before,
+                    'size_after': size_before, 'details': details, 'error': str(e)}
 
     def _format_size(self, size: int) -> str:
         """将字节数格式化为人类可读的大小字符串。"""
