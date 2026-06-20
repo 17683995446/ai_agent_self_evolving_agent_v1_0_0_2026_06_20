@@ -1,4 +1,3 @@
-import abc
 import os
 import json
 import pickle
@@ -6,7 +5,7 @@ import time
 from typing import Dict, Any, List, Optional
 
 
-class BaseLongTermMemory(abc.ABC):
+class BaseLongTermMemory:
     """Abstract base class for long-term memory storage.
 
     :param base_dir: 基础目录路径
@@ -30,16 +29,6 @@ class BaseLongTermMemory(abc.ABC):
         os.makedirs(self.knowledge_dir, exist_ok=True)
         os.makedirs(self.milestones_dir, exist_ok=True)
         os.makedirs(self.patterns_dir, exist_ok=True)
-
-    @abc.abstractmethod
-    def _abstract_memory_op(self) -> None:
-        """Abstract memory operation placeholder.
-
-        :param: 无
-        :type: 无
-        :return: 无
-        :rtype: None
-        """
 
     def save_knowledge(self, key: str, data: Dict[str, Any]) -> str:
         """Save knowledge data to a JSON file.
@@ -231,13 +220,4 @@ class LongTermMemory(BaseLongTermMemory):
     :return: 无
     :rtype: None
     """
-
-    def _abstract_memory_op(self) -> None:
-        """Concrete implementation of abstract memory operation.
-
-        :param: 无
-        :type: 无
-        :return: 无
-        :rtype: None
-        """
-        pass
+    pass

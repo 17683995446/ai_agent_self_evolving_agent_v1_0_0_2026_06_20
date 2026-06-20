@@ -1,9 +1,8 @@
-import abc
 from typing import Dict, Any, List, Optional
 from collections import deque
 
 
-class BaseRestructureTrigger(abc.ABC):
+class BaseRestructureTrigger:
     def __init__(self, high_error_threshold: float = 0.5,
                  stable_window: int = 20,
                  max_restructures: int = 3) -> None:
@@ -24,10 +23,6 @@ class BaseRestructureTrigger(abc.ABC):
         self._restructure_count: int = 0
         self._error_history: deque = deque(maxlen=stable_window)
         self._last_restructure_time: Optional[float] = None
-
-    @abc.abstractmethod
-    def _abstract_trigger_op(self) -> None:
-        """Abstract trigger operation placeholder."""
 
     def should_restructure(self, current_mae: float,
                            recent_errors: List[float]) -> bool:
@@ -99,6 +94,4 @@ class BaseRestructureTrigger(abc.ABC):
 
 
 class RestructureTrigger(BaseRestructureTrigger):
-    def _abstract_trigger_op(self) -> None:
-        """Concrete implementation of abstract trigger operation."""
-        pass
+    pass

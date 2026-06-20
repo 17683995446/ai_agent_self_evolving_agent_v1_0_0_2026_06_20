@@ -1,9 +1,8 @@
-import abc
 import time
 from typing import Dict, Any, List
 
 
-class BaseValueScorer(abc.ABC):
+class BaseValueScorer:
     """Abstract base class for value scoring.
 
     :param error_weight: 误差权重
@@ -32,16 +31,6 @@ class BaseValueScorer(abc.ABC):
         self.error_weight = error_weight
         self.novelty_weight = novelty_weight
         self.decay_hours = decay_hours
-
-    @abc.abstractmethod
-    def _abstract_score_op(self) -> None:
-        """Abstract scoring operation placeholder.
-
-        :param: 无
-        :type: 无
-        :return: 无
-        :rtype: None
-        """
 
     def compute_score(self, sample: Dict[str, Any]) -> float:
         """Compute the value score for a sample.
@@ -101,13 +90,4 @@ class ValueScorer(BaseValueScorer):
     :return: 无
     :rtype: None
     """
-
-    def _abstract_score_op(self) -> None:
-        """Concrete implementation of abstract scoring operation.
-
-        :param: 无
-        :type: 无
-        :return: 无
-        :rtype: None
-        """
-        pass
+    pass

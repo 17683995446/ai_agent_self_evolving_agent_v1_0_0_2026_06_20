@@ -246,10 +246,6 @@ class CycleTracer(BaseCycleTracer):
         """
         self._trace_logs.clear()
 
-    def _enforce_log_limit(self) -> None:
-        """限制日志数量防止内存无限增长（deque已自动处理）"""
-        pass
-
     def get_stats(self) -> Dict[str, Any]:
         """获取追踪统计信息。
 

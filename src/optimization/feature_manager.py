@@ -1,9 +1,8 @@
-import abc
 from typing import Dict, Any, List, Set
 from collections import deque
 
 
-class BaseFeatureManager(abc.ABC):
+class BaseFeatureManager:
     def __init__(self, base_features: List[str]) -> None:
         """Initialize the feature manager.
 
@@ -16,10 +15,6 @@ class BaseFeatureManager(abc.ABC):
         self.candidate_features: Set[str] = set()
         self._feature_scores: Dict[str, deque] = {}
         self._min_samples_for_eval: int = 10
-
-    @abc.abstractmethod
-    def _abstract_feature_op(self) -> None:
-        """Abstract feature operation placeholder."""
 
     def add_candidate(self, feature: str) -> None:
         """Add a candidate feature.
@@ -100,12 +95,10 @@ class BaseFeatureManager(abc.ABC):
 
 
 class FeatureManager(BaseFeatureManager):
-    def _abstract_feature_op(self) -> None:
-        """Concrete implementation of abstract feature operation."""
-        pass
+    pass
 
 
-class BaseModelReassembler(abc.ABC):
+class BaseModelReassembler:
     def __init__(self, predictor_registry: Dict[str, Any]) -> None:
         """Initialize the model reassembler.
 
@@ -116,10 +109,6 @@ class BaseModelReassembler(abc.ABC):
         """
         self.registry = predictor_registry
         self._assembly_history: deque = deque(maxlen=10)
-
-    @abc.abstractmethod
-    def _abstract_assemble_op(self) -> None:
-        """Abstract assembly operation placeholder."""
 
     def reassemble(self, active_features: List[str]) -> Dict[str, Any]:
         """Reassemble predictors for active features.
@@ -162,6 +151,4 @@ class BaseModelReassembler(abc.ABC):
 
 
 class ModelReassembler(BaseModelReassembler):
-    def _abstract_assemble_op(self) -> None:
-        """Concrete implementation of abstract assembly operation."""
-        pass
+    pass
