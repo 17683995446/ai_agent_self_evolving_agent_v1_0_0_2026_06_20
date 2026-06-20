@@ -1,3 +1,4 @@
+import logging
 import time
 import uuid
 from typing import Dict, Any, List, Optional, Callable
@@ -6,6 +7,8 @@ from src.task.task_definition import Task
 from src.multi_agent.orchestrator import MultiAgentOrchestrator
 from src.multi_agent.agent_worker import AgentWorker
 from src.memory.long_term import LongTermMemory
+
+logger = logging.getLogger(__name__)
 
 
 class LongTaskPlanner:
@@ -161,7 +164,8 @@ class LongTaskPlanner:
             return None
         try:
             checkpoint = self.memory.load_knowledge(self.plan_id)
-        except Exception:
+        except Exception as e:
+            logger.warning("LongTaskPlanner.resume: failed to load checkpoint %s: %s", self.plan_id, e)
             return None
         if checkpoint is None:
             return None

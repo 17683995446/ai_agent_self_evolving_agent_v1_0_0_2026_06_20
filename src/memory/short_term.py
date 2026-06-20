@@ -259,8 +259,8 @@ class ShortTermMemory(BaseShortTermMemory):
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='samples'")
                 if cursor.fetchone() is None:
                     self._init_tables()
-            except sqlite3.Error:
-                pass
+            except sqlite3.Error as e:
+                logger.warning("ShortTermMemory._ensure_tables: table check failed: %s", e)
 
     def _recover_corrupted_db(self) -> None:
         """数据库文件损坏时删除并重建
@@ -287,8 +287,8 @@ class ShortTermMemory(BaseShortTermMemory):
         """
         try:
             self._conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ShortTermMemory._close_connection: close failed: %s", e)
 
     def _remove_db_file(self) -> None:
         """Remove the database file.
@@ -301,8 +301,8 @@ class ShortTermMemory(BaseShortTermMemory):
         try:
             if os.path.exists(self.db_path):
                 os.remove(self.db_path)
-        except OSError:
-            pass
+        except OSError as e:
+            logger.warning("ShortTermMemory._remove_db_file: remove %s failed: %s", self.db_path, e)
 
     def _maybe_cleanup(self) -> None:
         """如果样本数超过上限，自动温和清理旧样本（保留80%）
@@ -318,8 +318,8 @@ class ShortTermMemory(BaseShortTermMemory):
             total = cursor.fetchone()[0]
             if total > self.max_samples:
                 self.cleanup_old_samples(retention_ratio=0.8)
-        except sqlite3.Error:
-            pass
+        except sqlite3.Error as e:
+            logger.warning("ShortTermMemory._maybe_cleanup: cleanup check failed: %s", e)
 
     def store_sample(self, sample: Dict[str, Any]) -> int:
         """Store a sample into the database.

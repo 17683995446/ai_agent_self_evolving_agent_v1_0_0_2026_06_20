@@ -1,4 +1,5 @@
 import abc
+import logging
 import os
 import re
 import time
@@ -6,6 +7,8 @@ from typing import Dict, Any, List, Optional, Tuple, Set
 from collections import deque
 
 from src.core.constants import DEFAULT_LOG_PATHS
+
+logger = logging.getLogger(__name__)
 
 
 class BaseLogSensor(abc.ABC):
@@ -88,8 +91,8 @@ class BaseLogSensor(abc.ABC):
                 total_errors, total_warns, new_error_types, new_warn_types = self._classify_line(
                     line, now, total_errors, total_warns, new_error_types, new_warn_types,
                 )
-        except (PermissionError, OSError):
-            pass
+        except (PermissionError, OSError) as e:
+            logger.debug("LogSensor._scan_file: scan %s failed: %s", log_path, e)
         return total_errors, total_warns, new_error_types, new_warn_types
 
     def _classify_line(self, line: str, now: float, total_errors: int, total_warns: int, new_error_types: Set[str], new_warn_types: Set[str]) -> Tuple[int, int, Set[str], Set[str]]:

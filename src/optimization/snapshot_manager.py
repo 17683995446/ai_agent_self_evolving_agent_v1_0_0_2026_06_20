@@ -274,8 +274,8 @@ class SnapshotManager(BaseSnapshotManager):
         if os.path.exists(entry['filepath']):
             try:
                 os.remove(entry['filepath'])
-            except OSError:
-                pass
+            except OSError as e:
+                logger.warning("SnapshotManager._delete_snapshot_file: remove %s failed: %s", entry['filepath'], e)
 
     def _enforce_limit(self) -> None:
         # 修复Bug4: 增加空列表保护，避免min([])崩溃
@@ -288,8 +288,8 @@ class SnapshotManager(BaseSnapshotManager):
         if os.path.exists(entry['filepath']):
             try:
                 os.remove(entry['filepath'])
-            except OSError:
-                pass
+            except OSError as e:
+                logger.warning("SnapshotManager._remove_snapshot_entry: remove %s failed: %s", entry['filepath'], e)
         self._snapshots.remove(entry)
 
     def verify_and_repair(self) -> Dict[str, Any]:

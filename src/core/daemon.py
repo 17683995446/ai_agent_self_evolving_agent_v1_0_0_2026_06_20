@@ -225,8 +225,8 @@ class BaseDaemonManager(abc.ABC):
         try:
             if os.path.exists(self.pid_file):
                 os.remove(self.pid_file)
-        except OSError:
-            pass
+        except OSError as e:
+            logger.warning("Daemon._remove_pid: remove %s failed: %s", self.pid_file, e)
 
     def _is_process_alive(self, pid: int) -> bool:
         """检查进程是否存活"""

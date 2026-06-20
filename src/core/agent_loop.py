@@ -623,8 +623,8 @@ class AgentLoop(BaseAgentLoop):
         if cycle % 10 == 0:
             try:
                 self.memory.cleanup_old_samples(retention_ratio=0.8)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("AgentLoop._step_cleanup: cleanup_old_samples failed at cycle %s: %s", cycle, e)
 
     def _build_result(self, result_data: Dict[str, Any],
                       cycle_duration: float) -> Dict[str, Any]:

@@ -218,8 +218,8 @@ class BaseResourceGuardian(abc.ABC):
         try:
             total_mb += os.path.getsize(os.path.join(root, f)) / (1024 ** 2)
             count += 1
-        except OSError:
-            pass
+        except OSError as e:
+            logger.debug("ResourceGuardian: getsize %s failed: %s", os.path.join(root, f), e)
         return total_mb, count
 
 

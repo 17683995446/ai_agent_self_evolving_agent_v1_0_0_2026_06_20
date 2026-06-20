@@ -11,12 +11,15 @@
 - 加载时优先尝试完整恢复，失败则回退到元数据模式，保证韧性
 """
 
+import logging
 import pickle
 from typing import Any, Dict, List, Optional
 
 from .skill import Skill
 from .skill_registry import SkillRegistry
 from src.memory.long_term import BaseLongTermMemory
+
+logger = logging.getLogger(__name__)
 
 
 class SkillPersistence:
@@ -70,8 +73,8 @@ class SkillPersistence:
             obj = self.memory.load_object(f"{self.SKILL_OBJ_PREFIX}{name}")
             if isinstance(obj, Skill):
                 return obj
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("SkillPersistence.load_skill: full load failed for %s, fall back to metadata: %s", name, e)
 
         meta = self.memory.load_knowledge(f"{self.SKILL_META_PREFIX}{name}")
         if meta is None:

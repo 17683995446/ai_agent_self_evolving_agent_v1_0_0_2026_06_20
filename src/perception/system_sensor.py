@@ -1,7 +1,10 @@
 import abc
+import logging
 import time
 import psutil
 from typing import Dict, Any, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 class BaseSystemSensor(abc.ABC):
@@ -143,8 +146,8 @@ class BaseSystemSensor(abc.ABC):
                 'free_gb': round(usage.free / (1024 ** 3), 2),
                 'percent': round(usage.percent / 100.0, 4),
             }
-        except PermissionError:
-            pass
+        except PermissionError as e:
+            logger.debug("SystemSensor: disk partition %s permission denied: %s", part.mountpoint, e)
         return disk_info
 
     def _compute_io_rates(self, disk_io: Optional[Any]) -> Dict[str, float]:
@@ -382,8 +385,8 @@ class BaseSystemSensor(abc.ABC):
                 'mem_percent': proc.info['memory_percent'] or 0.0,
             })
             count += 1
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            pass
+        except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+            logger.debug("SystemSensor: process scan skipped: %s", e)
         return zombie_count, top_cpu, top_mem, count
 
     def _build_process_result(self, pids: List[int], zombie_count: int, top_cpu: List[Dict[str, Any]], top_mem: List[Dict[str, Any]]) -> Dict[str, Any]:

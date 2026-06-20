@@ -183,8 +183,8 @@ class EventBus(BaseEventBus):
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(self._queue.put(event))
-        except RuntimeError:
-            pass
+        except RuntimeError as e:
+            logger.debug("EventBus.publish_async: no running loop, event dropped: %s", e)
 
     async def start(self) -> None:
         """启动事件分发循环。
@@ -212,7 +212,7 @@ class EventBus(BaseEventBus):
             try:
                 await self._task
             except asyncio.CancelledError:
-                pass
+                logger.debug("EventBus.stop: dispatch task cancelled")
         logger.info("EventBus stopped")
 
     async def _dispatch_loop(self) -> None:

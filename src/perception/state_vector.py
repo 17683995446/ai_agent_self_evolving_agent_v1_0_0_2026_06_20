@@ -1,4 +1,5 @@
 import abc
+import logging
 import os
 import time
 import psutil
@@ -7,6 +8,8 @@ from typing import Dict, Any, List, Optional
 from .system_sensor import SystemSensor
 from .log_sensor import LogSensor
 from .file_sensor import FileSensor
+
+logger = logging.getLogger(__name__)
 
 
 class BaseStateVector(abc.ABC):
@@ -77,7 +80,8 @@ class BaseStateVector(abc.ABC):
         """
         try:
             return sensor.perceive()
-        except Exception:
+        except Exception as e:
+            logger.debug("StateVector._safe_perceive: sensor %s failed: %s", type(sensor).__name__, e)
             return {}
 
     def _get_root_disk_percent(self, disk_data: Dict[str, Any]) -> float:
