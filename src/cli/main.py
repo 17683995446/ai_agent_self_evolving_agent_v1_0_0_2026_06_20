@@ -91,19 +91,36 @@ class AgentCLI(BaseAgentCLI):
     def _validate_config_path(self, config_path: str) -> bool:
         if not os.path.exists(config_path):
             logger.error("Config file not found: %s", config_path)
+            print()
+            print("Hint: Generate a default config with:")
+            print(f"  self-evolving-agent -c {config_path} config init")
+            print("Or run 'self-evolving-agent quickstart' for a guided setup.")
             return False
         return True
 
     def _run_agent(self, config_path: str, args: argparse.Namespace) -> int:
         logger.info("Starting Self-Evolving Agent with config: %s", config_path)
-        self.agent = AgentLoop(config_path)
+        try:
+            self.agent = AgentLoop(config_path)
+        except FileNotFoundError as e:
+            logger.error("Config file error: %s", e)
+            return 1
+        except Exception as e:
+            logger.error("Agent initialization failed: %s", e)
+            print()
+            print("Hint: Run 'self-evolving-agent config validate' to check config.")
+            return 1
         pid_path = os.path.join(self.agent.cfg.get('paths', {}).get('data_dir', 'data'), 'agent.pid')
         self._write_pid_file(pid_path)
         logger.info("Agent initialized. Running %s cycles...", args.cycles)
         try:
             self.agent.run(max_cycles=args.cycles, sleep_interval=args.interval)
+        except KeyboardInterrupt:
+            logger.info("Agent stopped by user (Ctrl+C)")
         except Exception as e:
-            logger.error("Agent error: %s", e)
+            logger.error("Agent runtime error: %s", e)
+            print()
+            print("Hint: Check logs with 'self-evolving-agent logs --lines 50'")
             return 1
         finally:
             self._remove_pid_file(pid_path)
@@ -117,11 +134,17 @@ class AgentCLI(BaseAgentCLI):
         config_path = args.config or DEFAULT_CONFIG_PATH
         if not self._validate_config_path(config_path):
             return 1
-        agent = AgentLoop(config_path)
-        pid_path = os.path.join(agent.cfg.get('paths', {}).get('data_dir', 'data'), 'agent.pid')
-        agent.stop()
+        # 轻量读取配置获取 PID 路径（不实例化 AgentLoop）
+        try:
+            import yaml
+            with open(config_path, 'r', encoding='utf-8') as f:
+                cfg = yaml.safe_load(f) or {}
+            data_dir = cfg.get('paths', {}).get('data_dir', 'data')
+        except Exception:
+            data_dir = 'data'
+        pid_path = os.path.join(data_dir, 'agent.pid')
         if not os.path.exists(pid_path):
-            logger.info("Agent is not running (no PID file found).")
+            print("Agent is not running (no PID file found).")
             return 0
         try:
             with open(pid_path, 'r') as f:
