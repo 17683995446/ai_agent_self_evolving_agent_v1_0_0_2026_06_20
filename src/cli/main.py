@@ -285,14 +285,130 @@ class AgentCLI(BaseAgentCLI):
         return 0
 
     def _config_validate(self, config_path: str) -> int:
+        """校验配置文件的字段合法性，输出友好的错误提示。
+
+        :param config_path: 配置文件路径。
+        :type config_path: str
+        :return: 全部校验通过返回0，存在错误返回1。
+        :rtype: int
+        """
+        errors = self._validate_config_fields(config_path)
+        if not errors:
+            print(f"Configuration is valid: {config_path}")
+            return 0
+        print(f"Configuration validation failed ({len(errors)} errors):")
+        for err in errors:
+            print(f"  - {err}")
+        print()
+        print("Fix hints:")
+        print("  - Run 'self-evolving-agent config init --force' to regenerate defaults")
+        print("  - Check field types: weights must be numbers, paths must be strings")
+        return 1
+
+    def _validate_config_fields(self, config_path: str) -> List[str]:
+        """校验配置字段，返回错误信息列表。
+
+        :param config_path: 配置文件路径。
+        :type config_path: str
+        :return: 错误信息列表，空列表表示全部通过。
+        :rtype: List[str]
+        """
+        errors: List[str] = []
+        if not os.path.exists(config_path):
+            return [f"Config file not found: {config_path}"]
+
         try:
-            agent = AgentLoop(config_path)
-            agent.stop()
-            logger.info("Configuration is valid.")
-        except Exception as e:
-            logger.error("Configuration error: %s", e)
-            return 1
-        return 0
+            import yaml
+            with open(config_path, 'r', encoding='utf-8') as f:
+                cfg = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            return [f"YAML parse error: {e}"]
+        except OSError as e:
+            return [f"Cannot read file: {e}"]
+
+        if cfg is None or not isinstance(cfg, dict):
+            return ["Config file is empty or not a YAML mapping"]
+
+        errors.extend(self._validate_base_weights(cfg))
+        errors.extend(self._validate_resource_limits(cfg))
+        errors.extend(self._validate_safety(cfg))
+        errors.extend(self._validate_paths(cfg))
+        errors.extend(self._validate_logging(cfg))
+        return errors
+
+    def _validate_base_weights(self, cfg: Dict[str, Any]) -> List[str]:
+        """校验驱力权重：必须为数字且和约为1.0。"""
+        errors: List[str] = []
+        bw = cfg.get('base_weights')
+        if bw is None:
+            return ["Missing 'base_weights' section"]
+        if not isinstance(bw, dict):
+            return ["'base_weights' must be a mapping"]
+        for key in ('safe', 'gain', 'eff'):
+            val = bw.get(key)
+            if val is None:
+                errors.append(f"base_weights.{key} is missing")
+            elif not isinstance(val, (int, float)):
+                errors.append(f"base_weights.{key} must be a number, got {type(val).__name__}")
+        if not errors:
+            total = bw.get('safe', 0) + bw.get('gain', 0) + bw.get('eff', 0)
+            if abs(total - 1.0) > 0.01:
+                errors.append(f"base_weights sum should be ~1.0, got {total:.4f}")
+        return errors
+
+    def _validate_resource_limits(self, cfg: Dict[str, Any]) -> List[str]:
+        """校验资源限制：百分比必须在 0~100。"""
+        errors: List[str] = []
+        rl = cfg.get('resource_limits', {})
+        if not isinstance(rl, dict):
+            return ["'resource_limits' must be a mapping"]
+        for key in ('max_cpu_percent', 'max_mem_percent'):
+            val = rl.get(key)
+            if val is not None:
+                if not isinstance(val, (int, float)):
+                    errors.append(f"resource_limits.{key} must be a number")
+                elif val < 0 or val > 100:
+                    errors.append(f"resource_limits.{key} must be 0~100, got {val}")
+        return errors
+
+    def _validate_safety(self, cfg: Dict[str, Any]) -> List[str]:
+        """校验安全配置。"""
+        errors: List[str] = []
+        safety = cfg.get('safety', {})
+        if not isinstance(safety, dict):
+            return ["'safety' must be a mapping"]
+        mcf = safety.get('max_consecutive_failures')
+        if mcf is not None and (not isinstance(mcf, int) or mcf < 0):
+            errors.append("safety.max_consecutive_failures must be a non-negative integer")
+        fp = safety.get('forbidden_paths')
+        if fp is not None and not isinstance(fp, list):
+            errors.append("safety.forbidden_paths must be a list")
+        return errors
+
+    def _validate_paths(self, cfg: Dict[str, Any]) -> List[str]:
+        """校验路径配置：必须为字符串。"""
+        errors: List[str] = []
+        paths = cfg.get('paths', {})
+        if not isinstance(paths, dict):
+            return ["'paths' must be a mapping"]
+        for key in ('data_dir', 'snapshot_dir', 'log_dir'):
+            val = paths.get(key)
+            if val is not None and not isinstance(val, str):
+                errors.append(f"paths.{key} must be a string, got {type(val).__name__}")
+        return errors
+
+    def _validate_logging(self, cfg: Dict[str, Any]) -> List[str]:
+        """校验日志配置。"""
+        errors: List[str] = []
+        log_cfg = cfg.get('logging', {})
+        if not isinstance(log_cfg, dict):
+            return ["'logging' must be a mapping"]
+        level = log_cfg.get('level')
+        if level is not None:
+            valid_levels = {'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'}
+            if not isinstance(level, str) or level.upper() not in valid_levels:
+                errors.append(f"logging.level must be one of {valid_levels}, got {level}")
+        return errors
 
     def _config_init(self, config_path: str, force: bool) -> int:
         if os.path.exists(config_path) and not force:
