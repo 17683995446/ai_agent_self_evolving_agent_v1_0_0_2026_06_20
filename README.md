@@ -81,6 +81,7 @@ self-evolving-agent <command> [options]
 | `quickstart` | 一键体验（doctor+init+cycle+status） | `quickstart` |
 | `dashboard` | 启动监控仪表盘 Web UI | `dashboard --port 8080` |
 | `cleanup` | 清理旧快照/日志/数据库碎片 | `cleanup --dry-run` |
+| `benchmark` | 性能基准测试（延迟/吞吐量/进化趋势） | `benchmark --cycles 20 --warmup 3` |
 | `config show` | 查看当前配置 | `config show` |
 | `config validate` | 校验配置合法性 | `config validate` |
 | `config init` | 生成默认配置文件 | `config init --force` |
@@ -90,7 +91,7 @@ self-evolving-agent <command> [options]
 
 - `--version, -V`：查看版本号
 - `--config, -c`：指定配置文件路径（默认按 `AGENT_ENV` 环境变量选择 dev/test/prod）
-- `--json`：以 JSON 格式输出（适用于 `status`、`cycle`）
+- `--json`：以 JSON 格式输出（适用于 `status`、`cycle`、`doctor`、`cleanup`、`config validate`、`benchmark`）
 - `--verbose, -v`：详细输出模式（显示周期分解详情，适用于 `cycle`）
 - `--no-color`：禁用彩色输出（TTY 环境下自动启用颜色，遵循 `NO_COLOR` 环境变量规范）
 
@@ -243,6 +244,10 @@ python examples/multi_agent_long_task_demo.py
 ## 文档
 
 - [项目白皮书](docs/PROJECT_WHITEPAPER.md)：系统架构与设计原理
+- [故障排查手册](docs/TROUBLESHOOTING.md)：常见问题诊断与解决
+- [常见问题](docs/FAQ.md)：配置、仪表盘、性能等高频问答
+- [安全实践](docs/SECURITY.md)：安全模型、配置建议、审计清单
+- [插件接入指南](docs/PLUGIN_GUIDE.md)：8 个扩展点开发指南
 - [交付清单](docs/DELIVERY_CHECKLIST.md)：验收标准
 - [API 文档](docs/api/openapi.yaml)：仪表盘 API 规范
 
