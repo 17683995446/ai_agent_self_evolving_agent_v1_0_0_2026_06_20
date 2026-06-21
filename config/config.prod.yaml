@@ -57,9 +57,15 @@ memory:
 logging:
   level: INFO
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  format_type: text  # text 或 json（json 便于日志聚合系统检索）
   file: logs/agent.log
   max_bytes: 10485760
   backup_count: 5
+  # 按模块级别配置日志（可选，覆盖全局 level）
+  # loggers:
+  #   src.core: DEBUG
+  #   src.cli: INFO
+  #   src.optimization: DEBUG
 
 paths:
   data_dir: data

@@ -3,10 +3,15 @@
 从 agent_loop.py 提取的日志系统配置逻辑，遵循单一职责原则：
 将日志处理器创建、根日志器配置、日志处理器清理等关注点从主循环中分离。
 
+支持特性：
+- 文本/JSON 两种日志格式（通过 logging.format_type 配置）
+- 按模块级别配置日志（通过 logging.loggers 映射配置）
+
 :author: self_evolving_agent
 :since: 阶段158
 """
 
+import json
 import logging
 import logging.handlers
 import os
@@ -38,6 +43,37 @@ class SafeRotatingFileHandler(logging.handlers.RotatingFileHandler):
             pass
 
 
+class JsonFormatter(logging.Formatter):
+    """JSON 格式日志格式化器。
+
+    将日志记录序列化为单行 JSON，便于 ELK/Loki/CloudWatch 等
+    日志聚合系统进行结构化检索与字段过滤。
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        """将日志记录格式化为 JSON 字符串。
+
+        :param record: 日志记录对象。
+        :type record: logging.LogRecord
+        :return: JSON 格式的日志字符串。
+        :rtype: str
+        """
+        log_entry: Dict[str, Any] = {
+            'timestamp': self.formatTime(record, self.datefmt),
+            'level': record.levelname,
+            'logger': record.name,
+            'message': record.getMessage(),
+            'module': record.module,
+            'func': record.funcName,
+            'line': record.lineno,
+            'thread': record.thread,
+            'process': record.process,
+        }
+        if record.exc_info:
+            log_entry['exception'] = self.formatException(record.exc_info)
+        return json.dumps(log_entry, ensure_ascii=False)
+
+
 class LoggingConfigurator:
     """日志系统配置器。
 
@@ -61,6 +97,7 @@ class LoggingConfigurator:
         os.makedirs(log_dir, exist_ok=True)
         handler = LoggingConfigurator.create_log_handler(log_cfg, log_dir)
         LoggingConfigurator.configure_root_logger(level, handler)
+        LoggingConfigurator.configure_module_loggers(log_cfg)
         return handler
 
     @staticmethod
@@ -87,11 +124,18 @@ class LoggingConfigurator:
     def create_formatter(log_cfg: Dict[str, Any]) -> logging.Formatter:
         """创建日志格式化器。
 
+        根据 format_type 配置决定使用文本格式还是 JSON 格式：
+        - text（默认）：使用 format 字段指定的文本格式
+        - json：使用 JsonFormatter 输出结构化 JSON 日志
+
         :param log_cfg: 日志配置字典。
         :type log_cfg: Dict[str, Any]
         :return: 格式化器实例。
         :rtype: logging.Formatter
         """
+        format_type = log_cfg.get('format_type', 'text').lower()
+        if format_type == 'json':
+            return JsonFormatter()
         fmt = log_cfg.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         return logging.Formatter(fmt)
 
@@ -110,6 +154,27 @@ class LoggingConfigurator:
         root.setLevel(level)
         LoggingConfigurator.close_existing_file_handlers(root)
         root.addHandler(handler)
+
+    @staticmethod
+    def configure_module_loggers(log_cfg: Dict[str, Any]) -> None:
+        """按模块级别配置日志器。
+
+        根据 logging.loggers 映射为指定模块设置独立日志级别，
+        实现如 src.core=DEBUG, src.cli=INFO 的差异化配置。
+        模块日志器默认 propagate=True，日志仍会传播到 root handler。
+
+        :param log_cfg: 日志配置字典，读取其中的 loggers 字段。
+        :type log_cfg: Dict[str, Any]
+        :return: 无。
+        :rtype: None
+        """
+        loggers_cfg = log_cfg.get('loggers', {})
+        if not isinstance(loggers_cfg, dict):
+            return
+        for name, lvl_name in loggers_cfg.items():
+            lvl = getattr(logging, str(lvl_name).upper(), None)
+            if lvl is not None:
+                logging.getLogger(name).setLevel(lvl)
 
     @staticmethod
     def close_existing_file_handlers(root: logging.Logger) -> None:

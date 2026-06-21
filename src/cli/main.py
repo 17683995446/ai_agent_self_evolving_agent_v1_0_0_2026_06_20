@@ -310,7 +310,8 @@ class AgentCLI(BaseAgentCLI):
                     pid = int(f.read().strip())
                 os.kill(pid, 0)  # 检查进程是否存在
                 running = True
-            except (ValueError, ProcessLookupError, PermissionError):
+            except (ValueError, ProcessLookupError, PermissionError) as e:
+                logger.debug("PID file read or process check failed: %s", e)
                 running = False
 
         # 轻量读取记忆样本数（直接查 SQLite，不实例化 AgentLoop）
@@ -585,10 +586,27 @@ class AgentCLI(BaseAgentCLI):
         if not isinstance(log_cfg, dict):
             return ["'logging' must be a mapping"]
         level = log_cfg.get('level')
+        valid_levels = {'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'}
         if level is not None:
-            valid_levels = {'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'}
             if not isinstance(level, str) or level.upper() not in valid_levels:
                 errors.append(f"logging.level must be one of {valid_levels}, got {level}")
+        # 校验 format_type（可选，text/json）
+        format_type = log_cfg.get('format_type')
+        if format_type is not None:
+            if not isinstance(format_type, str) or format_type.lower() not in {'text', 'json'}:
+                errors.append(f"logging.format_type must be 'text' or 'json', got {format_type}")
+        # 校验 loggers（可选，模块名→级别映射）
+        loggers_cfg = log_cfg.get('loggers')
+        if loggers_cfg is not None:
+            if not isinstance(loggers_cfg, dict):
+                errors.append("logging.loggers must be a mapping of module name to level")
+            else:
+                for mod_name, mod_level in loggers_cfg.items():
+                    if not isinstance(mod_level, str) or mod_level.upper() not in valid_levels:
+                        errors.append(
+                            f"logging.loggers['{mod_name}'] must be one of {valid_levels}, "
+                            f"got {mod_level}"
+                        )
         return errors
 
     def cmd_config_wizard(self, args: argparse.Namespace) -> int:
@@ -623,7 +641,7 @@ class AgentCLI(BaseAgentCLI):
         import yaml
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(self._default_config())
-            f.write('\n# === Wizard Customized Settings ===\n')
+            f.write('\n# === 向导自定义设置 ===\n')
             yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
         print(f"\n配置已创建: {config_path}")
@@ -1148,9 +1166,11 @@ paths:
             server.serve_forever()
         except KeyboardInterrupt:
             print("\nDashboard stopped.")
+            logger.info("Dashboard stopped by user (KeyboardInterrupt).")
             server.shutdown()
             server.server_close()
         except OSError as e:
+            logger.error("Failed to start dashboard on %s:%s: %s", host, actual_port, e)
             print(f"Failed to start dashboard on {host}:{actual_port}: {e}")
             if not auto_port:
                 print("Hint: Port may be in use. Try a different port with --port, "
