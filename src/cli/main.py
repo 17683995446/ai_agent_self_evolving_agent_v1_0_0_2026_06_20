@@ -1620,6 +1620,208 @@ paths:
             return f"{size / (1024 * 1024):.1f} MB"
         return f"{size / (1024 * 1024 * 1024):.2f} GB"
 
+    def cmd_benchmark(self, args: argparse.Namespace) -> int:
+        """性能基准测试：测量 Agent 循环的执行延迟、吞吐量和进化趋势。
+
+        创建一个 AgentLoop 实例，先运行预热周期（不计入统计），
+        再运行基准周期（计入统计），收集延迟/奖励/MAE/内存等指标。
+
+        :param args: 命令行参数，支持 --cycles/--warmup/--json。
+        :type args: argparse.Namespace
+        :return: 成功返回0，失败返回1。
+        :rtype: int
+        """
+        config_path = args.config or DEFAULT_CONFIG_PATH
+        if not self._validate_config_path(config_path):
+            return 1
+
+        cycles = args.cycles
+        warmup = args.warmup
+        json_output = getattr(args, 'json', False)
+
+        if not json_output:
+            print("=" * SEPARATOR_WIDTH)
+            print("Self-Evolving Agent - 性能基准测试")
+            print(f"  配置: {config_path}")
+            print(f"  预热: {warmup} 周期 | 基准: {cycles} 周期")
+            print("=" * SEPARATOR_WIDTH)
+            print()
+
+        # 初始化 AgentLoop（仅一次，避免重复初始化开销）
+        init_start = time.time()
+        try:
+            agent = AgentLoop(config_path)
+        except Exception as e:
+            logger.error("Failed to initialize AgentLoop: %s", e)
+            if not json_output:
+                print(_color.fail(f"AgentLoop 初始化失败: {e}"))
+            return 1
+        init_latency = (time.time() - init_start) * 1000  # ms
+
+        latencies: List[float] = []  # ms
+        rewards: List[float] = []
+        maes: List[float] = []
+        memory_samples: List[float] = []  # MB
+
+        try:
+            import psutil
+            proc = psutil.Process()
+        except ImportError:
+            proc = None
+
+        total_start = time.time()
+        completed = 0
+        interrupted = False
+
+        try:
+            # 预热阶段
+            for i in range(warmup):
+                agent.run_cycle()
+                if not json_output:
+                    print(f"\r  预热中... {i + 1}/{warmup}", end='', flush=True)
+            if not json_output and warmup > 0:
+                print(" 完成")
+
+            # 基准阶段
+            for i in range(cycles):
+                cycle_start = time.time()
+                result = agent.run_cycle()
+                cycle_latency = (time.time() - cycle_start) * 1000  # ms
+
+                latencies.append(cycle_latency)
+                reward = result.get('reward', {}).get('total_reward', 0.0)
+                rewards.append(reward)
+
+                errors = result.get('errors', {})
+                if isinstance(errors, dict) and errors:
+                    mae = sum(abs(v) for v in errors.values()) / len(errors)
+                else:
+                    mae = 0.0
+                maes.append(mae)
+
+                if proc is not None:
+                    memory_samples.append(proc.memory_info().rss / (1024 * 1024))
+
+                completed += 1
+                if not json_output:
+                    pct = (i + 1) / cycles * 100
+                    print(f"\r  基准测试... [{i + 1}/{cycles}] {pct:.0f}%  "
+                          f"latency={cycle_latency:.1f}ms  reward={reward:.4f}",
+                          end='', flush=True)
+        except KeyboardInterrupt:
+            interrupted = True
+        finally:
+            agent.stop()
+
+        total_duration = time.time() - total_start
+
+        if not json_output and completed > 0:
+            print(" 完成")
+            if interrupted:
+                print(_color.warn(f"  (用户中断，已完成 {completed}/{cycles} 周期)"))
+            print()
+
+        if completed == 0:
+            if not json_output:
+                print(_color.fail("未完成任何基准周期，无法生成报告。"))
+            return 1
+
+        # 计算统计指标
+        sorted_lat = sorted(latencies)
+        n = len(sorted_lat)
+
+        def percentile(data: List[float], pct: float) -> float:
+            if not data:
+                return 0.0
+            k = (len(data) - 1) * pct / 100.0
+            f = int(k)
+            c = min(f + 1, len(data) - 1)
+            if f == c:
+                return data[f]
+            return data[f] + (data[c] - data[f]) * (k - f)
+
+        latency_stats = {
+            'mean_ms': sum(latencies) / n,
+            'min_ms': min(latencies),
+            'max_ms': max(latencies),
+            'p95_ms': percentile(sorted_lat, 95.0),
+            'p99_ms': percentile(sorted_lat, 99.0),
+        }
+        throughput = completed / total_duration if total_duration > 0 else 0.0
+
+        trends = {
+            'reward': {
+                'first': rewards[0],
+                'last': rewards[-1],
+                'delta': rewards[-1] - rewards[0],
+            },
+            'mae': {
+                'first': maes[0],
+                'last': maes[-1],
+                'delta': maes[-1] - maes[0],
+            },
+        }
+        if memory_samples:
+            trends['memory_rss_mb'] = {
+                'start': memory_samples[0],
+                'end': memory_samples[-1],
+                'delta': memory_samples[-1] - memory_samples[0],
+            }
+
+        # JSON 输出
+        if json_output:
+            result = {
+                'config': {
+                    'config_path': config_path,
+                    'cycles_requested': cycles,
+                    'cycles_completed': completed,
+                    'warmup': warmup,
+                    'interrupted': interrupted,
+                },
+                'summary': {
+                    'total_duration_seconds': round(total_duration, 4),
+                    'throughput_cycles_per_second': round(throughput, 4),
+                    'init_latency_ms': round(init_latency, 2),
+                    'cycle_latency': {k: round(v, 4) for k, v in latency_stats.items()},
+                },
+                'trends': trends,
+            }
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            return 0
+
+        # 文本输出
+        print("-" * SEPARATOR_WIDTH)
+        print(_color.bold("性能摘要:"))
+        print(f"  总耗时:         {total_duration:.2f}s")
+        print(f"  吞吐量:         {throughput:.2f} cycles/s")
+        print(f"  初始化耗时:     {init_latency:.1f}ms")
+        print()
+        print(_color.bold("周期延迟:"))
+        print(f"  平均:           {latency_stats['mean_ms']:.1f}ms")
+        print(f"  最小:           {latency_stats['min_ms']:.1f}ms")
+        print(f"  最大:           {latency_stats['max_ms']:.1f}ms")
+        print(f"  P95:            {latency_stats['p95_ms']:.1f}ms")
+        print(f"  P99:            {latency_stats['p99_ms']:.1f}ms")
+        print()
+        print(_color.bold("进化趋势:"))
+        r_delta = trends['reward']['delta']
+        r_sign = '+' if r_delta >= 0 else ''
+        print(f"  奖励:           {trends['reward']['first']:.4f} → "
+              f"{trends['reward']['last']:.4f} ({r_sign}{r_delta:.4f})")
+        m_delta = trends['mae']['delta']
+        m_sign = '+' if m_delta >= 0 else ''
+        mae_text = f"{trends['mae']['first']:.4f} → {trends['mae']['last']:.4f} ({m_sign}{m_delta:.4f})"
+        if m_delta < 0:
+            print(f"  MAE:            {mae_text}  {_color.ok('(改善)')}")
+        else:
+            print(f"  MAE:            {mae_text}  {_color.warn('(恶化)')}")
+        if 'memory_rss_mb' in trends:
+            mem = trends['memory_rss_mb']
+            print(f"  内存 RSS:       {mem['start']:.1f}MB → {mem['end']:.1f}MB "
+                  f"({mem['delta']:+.1f}MB)")
+        print("=" * SEPARATOR_WIDTH)
+        return 0
+
 
 def _resolve_config_path(args_config: Optional[str]) -> str:
     if args_config:
@@ -1714,6 +1916,14 @@ def main() -> int:
     cleanup_parser.add_argument('--dry-run', action='store_true',
                                 help='Show what would be cleaned without deleting')
 
+    # benchmark
+    benchmark_parser = subparsers.add_parser(
+        'benchmark', help='Run performance benchmark on agent cycles')
+    benchmark_parser.add_argument('--cycles', type=int, default=20,
+                                  help='Number of benchmark cycles (default: 20)')
+    benchmark_parser.add_argument('--warmup', type=int, default=3,
+                                  help='Number of warmup cycles before benchmark (default: 3)')
+
     args = parser.parse_args()
 
     if getattr(args, 'no_color', False):
@@ -1736,6 +1946,7 @@ def main() -> int:
         'quickstart': cli.cmd_quickstart,
         'dashboard': cli.cmd_dashboard,
         'cleanup': cli.cmd_cleanup,
+        'benchmark': cli.cmd_benchmark,
     }
 
     handler = command_map.get(args.command)
